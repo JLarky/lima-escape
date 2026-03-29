@@ -1,3 +1,33 @@
+async function runEditorCommand(args: string[]) {
+    const commands = ["code", "cursor"];
+
+    for (const cmd of commands) {
+        try {
+            console.log(`running ${cmd} with args`, args);
+            const command = new Deno.Command(cmd, { args });
+            const { code, stdout, stderr } = await command.output();
+            return { code, stdout, stderr };
+        } catch (e) {
+            console.error(`${cmd} command failed:`, e);
+            if (cmd === commands[commands.length - 1]) {
+                // Last command failed, return error
+                return {
+                    code: 1,
+                    stdout: new TextEncoder().encode(`Failed to execute a command in lima-code server: ${e}`),
+                    stderr: new TextEncoder().encode('Error'),
+                };
+            }
+            // Try next command
+        }
+    }
+
+    return {
+        code: 1,
+        stdout: new TextEncoder().encode('No editor command available. Make sure that you are running the server inside of your editors built-in terminal.'),
+        stderr: new TextEncoder().encode('Error'),
+    };
+}
+
 export async function startServer() {
     console.log('starting server');
 
@@ -7,17 +37,8 @@ export async function startServer() {
     await receiveMessages(tmpDir.tmpDir + '/socket', async (message, sendResponse) => {
         console.log("Received:", message);
         const { args } = JSON.parse(message);
-        console.log('running cursor with args', args);
-        // Define the command to run 'echo "Hello from Deno!"'
-        const command = new Deno.Command("cursor", {
-            args: args,
-        });
 
-        // Execute the command and wait for its output
-        const { code, stdout, stderr } = await (async () => await command.output())().catch(e => {
-            console.error('error', e);
-            return { code: 1, stdout: new TextEncoder().encode(`Failed to execute a command in lima-code server: ${e}`), stderr: new TextEncoder().encode('Error') };
-        });
+        const { code, stdout, stderr } = await runEditorCommand(args);
 
         console.log('exit code', code);
 

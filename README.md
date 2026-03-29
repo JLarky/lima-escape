@@ -24,14 +24,15 @@ This script is trying to not to ask for too many permissions. Both commands need
 to have access to `/tmp` so that they are able to talk to each other, thus
 --allow-write and --allow-read.
 
-Server needs to be able to run `cursor` command (which is an alias for something
-like
-`~/.cursor-server/cli/servers/Stable-fea2f546c979a0a4ad1deab23552a43568807590/server/bin/remote-cli/cursor`),
-thus --allow-run.
+Server needs to be able to run `code` or `cursor` command (which is an alias for
+something like
+`~/.cursor-server/cli/servers/Stable-id/server/bin/remote-cli/cursor` or
+`~/.vscode-server/cli/servers/Stable-id/server/bin/remote-cli/code`), thus
+--allow-run.
 
 You can see from
-[this line](https://github.com/JLarky/lima-code/blob/main/shared.ts#L12) that we
-are only running `cursor` command, instead of unbound shell commands.
+[this line](https://github.com/JLarky/lima-code/blob/main/shared.ts#L2) that we
+are only running `code` or `cursor` commands, instead of unbound shell commands.
 
 Because we use `glob` from `node:fs` module it wants to access
 `__MINIMATCH_TESTING_PLATFORM__` environment variable, thus --ignore-env.
