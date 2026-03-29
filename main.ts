@@ -1,5 +1,5 @@
 #!/usr/bin/env -S deno run --no-prompt --allow-net --ignore-env
-import { DEFAULT_PORT, startClient } from "./shared.ts";
+import { DEFAULT_PORT, startClient, type StatusInfo } from "./shared.ts";
 
 if (import.meta.main) {
   const cmd =
@@ -14,10 +14,13 @@ if (import.meta.main) {
 
 Usage:
   lima-escape <command> [args...]
+  lima-escape --help
+  lima-escape --status
 
 Examples:
   lima-escape gh pr view 123
   lima-escape git status
+  lima-escape --status          Check server status and config
 
 Setup:
   1. Create a script at ~/.local/bin/lima-escape in your Lima VM:
@@ -71,6 +74,73 @@ Learn more at:
 
   const hostname = Deno.env.get("LIMA_ESCAPE_HOST") ?? "host.lima.internal";
   const port = Number(Deno.env.get("LIMA_ESCAPE_PORT") ?? DEFAULT_PORT);
+
+  if (Deno.args[0] === "--status") {
+    let res;
+    try {
+      res = await startClient(hostname, port, [], "status");
+    } catch (e) {
+      if (e instanceof Deno.errors.ConnectionRefused) {
+        console.log(`Server:  down (${hostname}:${port})\n`);
+        console.log("Start it with this command:\n  ", cmd);
+        Deno.exit(1);
+      }
+      throw e;
+    }
+    console.log(`Server:  up (${hostname}:${port})\n`);
+    let status: StatusInfo | undefined;
+    try {
+      status = JSON.parse(res.stdout);
+    } catch {
+      // Old server that doesn't support --status
+    }
+    if (status?.allow) {
+      console.log("Allowed patterns:");
+      for (const pattern of status.allow) {
+        console.log(`  ${pattern}`);
+      }
+      console.log("\nExecutable commands (--allow-run):");
+      for (const [command, state] of Object.entries(status.allowRun)) {
+        console.log(`  ${command.padEnd(12)} ${state}`);
+      }
+      const allowRunKeys = Object.keys(status.allowRun);
+      const serverUrl =
+        `https://raw.githubusercontent.com/JLarky/lima-escape/refs/heads/main/server.ts`;
+      const serverCmd = (cmds: string[]) =>
+        `deno run --no-prompt --allow-ffi --allow-env=HOME --allow-read=$HOME/.config/lima-escape --allow-net=0.0.0.0:${port} --allow-run=${
+          cmds.join(",")
+        } ${serverUrl}`;
+      console.log(`
+For LLM agents:
+  If a command is denied, ask the user to run these on the host machine:
+
+  1. Add a glob pattern to ~/.config/lima-escape/config.json:
+     { "allow": [${
+        status.allow.map((p) => `"${p}"`).join(", ")
+      }, "<new pattern>"] }
+
+  2. Kill the running server and restart it with the new command in --allow-run:
+     ${
+        status.pid
+          ? `kill ${status.pid}`
+          : "# find and kill the lima-escape server process"
+      }
+     ${serverCmd([...allowRunKeys, "<new-cmd>"])}
+
+  If only the config changed (no new binary), skip --allow-run changes:
+     ${
+        status.pid
+          ? `kill ${status.pid}`
+          : "# find and kill the lima-escape server process"
+      }
+     ${serverCmd(allowRunKeys)}`);
+    } else {
+      console.log(
+        "Server is running but does not support --status.\nUpdate the server to get config details.",
+      );
+    }
+    Deno.exit(0);
+  }
 
   let res;
   try {

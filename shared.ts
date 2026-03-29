@@ -1,8 +1,15 @@
 export const DEFAULT_PORT = 27332;
 
 export interface Request {
+  type?: "exec" | "status";
   argv: string[];
   cwd: string;
+}
+
+export interface StatusInfo {
+  allow: string[];
+  allowRun: Record<string, string>;
+  pid: number;
 }
 
 export interface Response {
@@ -56,7 +63,24 @@ async function handleConnection(conn: Deno.Conn, opts: ServerOptions) {
 
     let res: Response;
 
-    if (!opts.isAllowed(req.argv, opts.allow)) {
+    if (req.type === "status") {
+      const commands = [...new Set(opts.allow.map((p) => p.split(" ")[0]))];
+      const allowRun: Record<string, string> = {};
+      for (const cmd of commands) {
+        try {
+          const perm = await Deno.permissions.query({
+            name: "run",
+            command: cmd,
+          } as Deno.PermissionDescriptor);
+          allowRun[cmd] = perm.state;
+        } catch {
+          allowRun[cmd] = "unknown";
+        }
+      }
+      const status: StatusInfo = { allow: opts.allow, allowRun, pid: Deno.pid };
+      res = { code: 0, stdout: JSON.stringify(status), stderr: "" };
+      console.log("status request from client");
+    } else if (!opts.isAllowed(req.argv, opts.allow)) {
       const cmd = req.argv.join(" ");
       res = {
         code: 1,
@@ -92,11 +116,12 @@ export async function startClient(
   hostname: string,
   port: number,
   argv: string[],
+  type?: "exec" | "status",
 ): Promise<Response> {
   const conn = await Deno.connect({ hostname, port });
 
   try {
-    const req: Request = { argv, cwd: Deno.cwd() };
+    const req: Request = { type, argv, cwd: Deno.cwd() };
     await conn.write(new TextEncoder().encode(JSON.stringify(req)));
 
     const buffer = new Uint8Array(65536);
