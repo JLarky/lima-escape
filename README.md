@@ -42,6 +42,14 @@ deno run --no-prompt --allow-net --ignore-env https://raw.githubusercontent.com/
 The client sends the argv to the server, which checks it against the allowlist.
 If allowed, it executes the command and returns stdout, stderr, and exit code.
 
+Use `--help` for setup instructions and `--status` to check server connectivity
+and see currently allowed patterns:
+
+```bash
+lima-escape --help
+lima-escape --status
+```
+
 ## Permissions
 
 - **Server**: `--allow-run` (execute commands), `--allow-ffi` (for fnmatch),

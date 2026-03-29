@@ -85,7 +85,7 @@ async function handleConnection(conn: Deno.Conn, opts: ServerOptions) {
       res = {
         code: 1,
         stdout: "",
-        stderr: `denied: "${cmd}" does not match any allowed pattern`,
+        stderr: `denied: "${cmd}" does not match any allowed pattern\n\nRun \`lima-escape --help\` for setup instructions or \`lima-escape --status\` to see currently allowed patterns.`,
         error: "denied",
       };
       console.log("denied:", cmd);

@@ -161,8 +161,14 @@ For LLM agents:
     throw e;
   }
 
-  if (res.stdout) Deno.stdout.writeSync(new TextEncoder().encode(res.stdout));
-  if (res.stderr) Deno.stderr.writeSync(new TextEncoder().encode(res.stderr));
+  if (res.stdout) {
+    const out = res.stdout.endsWith("\n") ? res.stdout : res.stdout + "\n";
+    Deno.stdout.writeSync(new TextEncoder().encode(out));
+  }
+  if (res.stderr) {
+    const err = res.stderr.endsWith("\n") ? res.stderr : res.stderr + "\n";
+    Deno.stderr.writeSync(new TextEncoder().encode(err));
+  }
 
   Deno.exit(res.code);
 }
