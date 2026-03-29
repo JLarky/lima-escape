@@ -1,5 +1,11 @@
 export const DEFAULT_PORT = 27332;
 
+/** Maximum size of a response the client will read (1MB) */
+export const MAX_RESPONSE_SIZE = 1024 * 1024;
+
+/** Maximum size of stdout/stderr the server will send. Leave room for JSON envelope. */
+export const MAX_OUTPUT_SIZE = MAX_RESPONSE_SIZE - 1024;
+
 export interface Request {
   type?: "exec" | "status";
   argv: string[];
@@ -25,14 +31,27 @@ export interface ServerOptions {
   port?: number;
 }
 
+export function truncateOutput(
+  text: string,
+  limit: number,
+): { text: string; truncated: number } {
+  if (text.length <= limit) return { text, truncated: 0 };
+  const truncated = text.length - limit;
+  return {
+    text: text.slice(0, limit) +
+      `\n... ${truncated} bytes truncated by lima-escape`,
+    truncated,
+  };
+}
+
 async function executeCommand(argv: string[], cwd: string): Promise<Response> {
   const command = new Deno.Command(argv[0], { args: argv.slice(1), cwd });
   const { code, stdout, stderr } = await command.output();
-  return {
-    code,
-    stdout: new TextDecoder().decode(stdout),
-    stderr: new TextDecoder().decode(stderr),
-  };
+  const stdoutLimit = Math.floor(MAX_OUTPUT_SIZE / 2);
+  const stderrLimit = MAX_OUTPUT_SIZE - stdoutLimit;
+  const out = truncateOutput(new TextDecoder().decode(stdout), stdoutLimit);
+  const err = truncateOutput(new TextDecoder().decode(stderr), stderrLimit);
+  return { code, stdout: out.text, stderr: err.text };
 }
 
 export async function startServer(opts: ServerOptions) {
@@ -85,7 +104,8 @@ async function handleConnection(conn: Deno.Conn, opts: ServerOptions) {
       res = {
         code: 1,
         stdout: "",
-        stderr: `denied: "${cmd}" does not match any allowed pattern\n\nRun \`lima-escape --help\` for setup instructions or \`lima-escape --status\` to see currently allowed patterns.`,
+        stderr:
+          `denied: "${cmd}" does not match any allowed pattern\n\nRun \`lima-escape --help\` for setup instructions or \`lima-escape --status\` to see currently allowed patterns.`,
         error: "denied",
       };
       console.log("denied:", cmd);
@@ -124,13 +144,53 @@ export async function startClient(
     const req: Request = { type, argv, cwd: Deno.cwd() };
     await conn.write(new TextEncoder().encode(JSON.stringify(req)));
 
+    // Read all chunks until connection closes, up to MAX_RESPONSE_SIZE
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    let truncated = false;
     const buffer = new Uint8Array(65536);
-    const n = await conn.read(buffer);
-    if (n === null) {
+    while (true) {
+      const n = await conn.read(buffer);
+      if (n === null) break;
+      if (totalBytes + n > MAX_RESPONSE_SIZE) {
+        chunks.push(buffer.slice(0, MAX_RESPONSE_SIZE - totalBytes));
+        totalBytes = MAX_RESPONSE_SIZE;
+        truncated = true;
+        break;
+      }
+      chunks.push(buffer.slice(0, n));
+      totalBytes += n;
+    }
+
+    if (totalBytes === 0) {
       throw new Error("Server closed connection without responding");
     }
 
-    return JSON.parse(new TextDecoder().decode(buffer.subarray(0, n)));
+    const merged = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      merged.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    const text = new TextDecoder().decode(merged);
+    try {
+      const res: Response = JSON.parse(text);
+      if (truncated) {
+        res.stderr = (res.stderr ? res.stderr + "\n" : "") +
+          "Response truncated by lima-escape client (exceeded 1MB)";
+      }
+      return res;
+    } catch {
+      // JSON was truncated — return what we can
+      return {
+        code: 1,
+        stdout: text.slice(0, 1024),
+        stderr:
+          `lima-escape: server response too large to parse (${totalBytes} bytes received, truncated: ${truncated}). Try a command that produces less output.`,
+        error: "response_too_large",
+      };
+    }
   } finally {
     conn.close();
   }
