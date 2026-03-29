@@ -1,8 +1,13 @@
 {
   "tasks": {
-    "dev": "deno run --watch main.ts"
+    "server": "deno run --no-prompt --allow-run --allow-read --allow-ffi --allow-net --allow-env=HOME server.ts",
+    "client": "deno run --no-prompt --allow-net --allow-env=LIMA_ESCAPE_HOST,LIMA_ESCAPE_PORT main.ts"
   },
   "imports": {
-    "@std/assert": "jsr:@std/assert@1"
+    "@std/assert": "jsr:@std/assert@1",
+    "@std/path": "jsr:@std/path@1"
+  },
+  "test": {
+    "include": ["*_test.ts"]
   }
 }

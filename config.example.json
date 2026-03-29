@@ -1,0 +1,11 @@
+{
+  "allow": [
+    "gh pr view *",
+    "gh pr list *",
+    "gh issue view *",
+    "gh issue list *",
+    "git status",
+    "git log *",
+    "git diff *"
+  ]
+}
