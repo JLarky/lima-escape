@@ -1,4 +1,4 @@
-#!/usr/bin/env -S deno run --no-prompt --allow-net --allow-env=LIMA_ESCAPE_HOST,LIMA_ESCAPE_PORT
+#!/usr/bin/env -S deno run --no-prompt --allow-net --ignore-env
 import { DEFAULT_PORT, startClient } from "./shared.ts";
 
 if (import.meta.main) {

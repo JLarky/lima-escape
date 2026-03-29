@@ -25,25 +25,18 @@ Patterns use POSIX `fnmatch` glob syntax — `*` matches anything.
 ### 2. Start the server (on host)
 
 ```bash
-deno run --no-prompt --allow-run --allow-read --allow-write=/tmp --allow-ffi --allow-env=HOME server.ts
+deno run --no-prompt --allow-ffi --allow-env=HOME --allow-read=$HOME/.config/lima-escape --allow-net=0.0.0.0:27332 --allow-run=gh,git https://raw.githubusercontent.com/JLarky/lima-escape/refs/heads/main/server.ts
 ```
 
-Or with the deno task:
-
-```bash
-deno task server
-```
+Adjust `--allow-run` to have additional layer of security by only allowing
+specific commands to be executed on the host. By default, it allows `gh` and
+`git` since that's the example commands in the config, but you can add more or
+use `--allow-run=*` to run everything allowed in the config.
 
 ### 3. Run commands (from inside the VM)
 
 ```bash
-deno run --no-prompt --allow-read=/tmp --allow-write=/tmp main.ts gh pr view 123
-```
-
-Or with the deno task:
-
-```bash
-deno task client gh pr view 123
+deno run --no-prompt --allow-net --ignore-env https://raw.githubusercontent.com/JLarky/lima-escape/refs/heads/main/main.ts gh pr view 123
 ```
 
 The client sends the argv to the server, which checks it against the allowlist.
@@ -51,10 +44,11 @@ If allowed, it executes the command and returns stdout, stderr, and exit code.
 
 ## Permissions
 
-- **Server**: `--allow-run` (execute commands), `--allow-read` (config + /tmp),
-  `--allow-write=/tmp` (socket), `--allow-ffi` (fnmatch via libc),
-  `--allow-env=HOME` (find config path)
-- **Client**: `--allow-read=/tmp` and `--allow-write=/tmp` (connect to socket)
+- **Server**: `--allow-run` (execute commands), `--allow-ffi` (for fnmatch),
+  `--allow-env=HOME` and `--allow-read` (to read the config file), `--allow-net`
+  (to listen for client connections)
+- **Client**: `--allow-net` (to connect to the server), `--ignore-env` (change
+  to --allow-end=LIMA_ESCAPE_HOST,LIMA_ESCAPE_PORT if you need to adjust that)
 
 ## Security
 
@@ -62,5 +56,6 @@ If allowed, it executes the command and returns stdout, stderr, and exit code.
 2. **No shell**: always `Deno.Command` with argv array, never `sh -c`
 3. **Argv-in, argv-out**: client sends pre-split argv from the OS, server
    executes as argv — no string splitting
-4. **Socket in /tmp**: any local user can connect to the socket. This is a known
-   limitation (same as lima-code before it)
+4. **TCP exposure**: server binds to `0.0.0.0` by default — any host on the
+   network can connect. Scope with `--allow-net=0.0.0.0:27332` for the listening
+   port only
