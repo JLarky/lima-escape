@@ -27,7 +27,6 @@ export interface Response {
   error?: string;
 }
 
-import { prettyPrintPattern } from "./match.ts";
 import type { AllowResult, Pattern, Rules } from "./match.ts";
 
 export interface ServerOptions {
@@ -110,9 +109,12 @@ async function handleConnection(conn: Deno.Conn, opts: ServerOptions) {
     if (req.type === "status") {
       const commands = [
         ...new Set(
-          Object.values(opts.allow).flat().map((p) =>
-            prettyPrintPattern(p).split(" ")[0]
-          ),
+          Object.values(opts.allow).flat().flatMap((p) => {
+            if (typeof p === "string") return [p.split(" ")[0]];
+            const first = p[0];
+            if (typeof first === "string") return [first];
+            return first; // string[] alternatives — all are possible commands
+          }),
         ),
       ];
       const allowRun: Record<string, string> = {};
