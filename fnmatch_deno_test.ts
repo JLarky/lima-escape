@@ -1,5 +1,11 @@
 import { assertEquals } from "@std/assert";
-import { cwdSpecificity, fnmatch, isAllowed, type Rules } from "./fnmatch.ts";
+import {
+  cwdSpecificity,
+  fnmatch,
+  isAllowed,
+  matchCommand,
+  type Rules,
+} from "./fnmatch.ts";
 
 // POSIX fnmatch flags — values are from glibc fnmatch.h
 const FNM_PATHNAME = 0x01;
@@ -244,4 +250,84 @@ Deno.test("security: FNM_PATHNAME prevents * from matching /", () => {
 
 Deno.test("security: FNM_PATHNAME still allows args without /", () => {
   assertEquals(fnmatch("gh pr view *", "gh pr view 123", FNM_PATHNAME), true);
+});
+
+// --- Argv-join ambiguity (issue #3) ---
+// argv.join(" ") erases argument boundaries. An attacker controlling the argv
+// array can embed spaces in individual elements to craft a joined string that
+// matches allowlist patterns while executing a different command.
+
+Deno.test("argv-ambiguity: space in argv element cannot spoof pattern match", () => {
+  // ["gh", "pr view", "123"] joins to "gh pr view 123" which matches "gh pr view *"
+  // but actually executes: gh "pr view" "123" — different from gh pr view 123
+  const rules: Rules = { allow: { "*": ["gh pr view *"] } };
+  assertEquals(
+    isAllowed(["gh", "pr view", "123"], "/any", rules).allowed,
+    false,
+  );
+});
+
+Deno.test("argv-ambiguity: space in command name cannot spoof pattern", () => {
+  // ["gh pr", "view", "123"] tries to execute a binary named "gh pr"
+  const rules: Rules = { allow: { "*": ["gh pr view *"] } };
+  assertEquals(
+    isAllowed(["gh pr", "view", "123"], "/any", rules).allowed,
+    false,
+  );
+});
+
+Deno.test("argv-ambiguity: single-element argv cannot match multi-word pattern", () => {
+  // ["git status"] as one element tries to run binary "git status", not git + status
+  const rules: Rules = { allow: { "*": ["git status"] } };
+  assertEquals(isAllowed(["git status"], "/any", rules).allowed, false);
+});
+
+Deno.test("argv-ambiguity: quoted arg with space still works with wildcard", () => {
+  // ["echo", "hello world"] is legitimate — shell passes "hello world" as one arg
+  const rules: Rules = { allow: { "*": ["echo *"] } };
+  assertEquals(
+    isAllowed(["echo", "hello world"], "/any", rules).allowed,
+    true,
+  );
+});
+
+Deno.test("argv-ambiguity: normal argv unaffected", () => {
+  // ["gh", "pr", "view", "123"] should still match "gh pr view *"
+  const rules: Rules = { allow: { "*": ["gh pr view *"] } };
+  assertEquals(
+    isAllowed(["gh", "pr", "view", "123"], "/any", rules).allowed,
+    true,
+  );
+});
+
+Deno.test("argv-ambiguity: multiple trailing args still match trailing wildcard", () => {
+  // ["gh", "pr", "view", "123", "--web"] should match "gh pr view *"
+  const rules: Rules = { allow: { "*": ["gh pr view *"] } };
+  assertEquals(
+    isAllowed(["gh", "pr", "view", "123", "--web"], "/any", rules).allowed,
+    true,
+  );
+});
+
+Deno.test("argv-ambiguity: exact match requires exact element count", () => {
+  // "git status" should match ["git", "status"] but not ["git", "status", "--short"]
+  const rules: Rules = { allow: { "*": ["git status"] } };
+  assertEquals(isAllowed(["git", "status"], "/any", rules).allowed, true);
+  assertEquals(
+    isAllowed(["git", "status", "--short"], "/any", rules).allowed,
+    false,
+  );
+});
+
+Deno.test("argv-ambiguity: wildcard in middle position matches single element", () => {
+  // "gh * --json" should match ["gh", "pr", "--json"] but not ["gh", "pr", "view", "--json"]
+  const rules: Rules = { allow: { "*": ["gh * --json"] } };
+  assertEquals(
+    isAllowed(["gh", "pr", "--json"], "/any", rules).allowed,
+    true,
+  );
+  assertEquals(
+    isAllowed(["gh", "pr", "view", "--json"], "/any", rules).allowed,
+    false,
+  );
 });

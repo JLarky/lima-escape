@@ -98,6 +98,16 @@ Deno.test("integration: allowed command executes and returns output", async () =
   });
 });
 
+Deno.test("integration: argv with embedded spaces is denied (issue #3)", async () => {
+  await withServer(TEST_CONFIG, async (port) => {
+    // ["echo hello", "world"] joins to "echo hello world" which would match "echo *"
+    // but per-element matching sees argv[0]="echo hello" which doesn't match "echo"
+    const res = await startClient("127.0.0.1", port, ["echo hello", "world"]);
+    assertEquals(res.code, 1);
+    assertEquals(res.error, "denied");
+  });
+});
+
 Deno.test("integration: denied command returns error", async () => {
   await withServer(TEST_CONFIG, async (port) => {
     const res = await startClient("127.0.0.1", port, ["ls"]);
