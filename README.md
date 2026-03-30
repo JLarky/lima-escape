@@ -103,6 +103,18 @@ lima-escape --help     # full setup reference
 3. **No shell**: always `Deno.Command` with argv array, never `sh -c`
 4. **Argv-in, argv-out**: client sends pre-split argv from the OS, server
    executes as argv — no string splitting
-5. **TCP exposure**: server binds to `0.0.0.0` by default — any host on the
+5. **cwd validation**: the server resolves the client-provided working directory
+   with `realPath`, rejecting non-absolute, non-existent, or non-directory
+   paths. This prevents path traversal and fabricated paths.
+6. **TCP exposure**: server binds to `0.0.0.0` by default — any host on the
    network can connect. Scope with `--allow-net=0.0.0.0:27332` for the listening
    port only
+
+### Limitations of cwd-scoped deny rules
+
+Directory-scoped deny rules (e.g., denying `git *` in `/sensitive`) are
+**organizational convenience, not a security boundary**. The cwd only controls
+where the process starts — commands can have global effects via their own flags
+(e.g., `git -C /other/path`, `gh --repo owner/repo`). The real security
+boundaries are the **command pattern allowlist** and Deno's **`--allow-run`**
+permission.

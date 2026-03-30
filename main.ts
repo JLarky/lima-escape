@@ -79,7 +79,10 @@ Setup:
      }
 
      Keys are directory patterns (fnmatch globs). "*" matches any directory.
-     Deny rules take precedence over allow rules.
+     Deny rules take precedence over allow rules. Note: cwd deny rules are
+     organizational — commands can still have global effects via their own
+     flags (e.g. git -C, gh --repo). Use command patterns as the primary
+     security boundary.
 
   6. Authenticate from the VM:
 
