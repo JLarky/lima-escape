@@ -1,4 +1,4 @@
-import { join } from "@std/path";
+import { join } from "node:path";
 import type { Pattern } from "./match.ts";
 
 export interface Config {
