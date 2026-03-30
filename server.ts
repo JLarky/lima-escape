@@ -1,6 +1,6 @@
-#!/usr/bin/env -S deno run --no-prompt --allow-run --allow-read --allow-ffi --allow-net --allow-env=HOME,LIMA_ESCAPE_TOKENS
+#!/usr/bin/env -S deno run --no-prompt --allow-run --allow-read --allow-net --allow-env=HOME,LIMA_ESCAPE_TOKENS
 import { loadConfig, loadTokens } from "./config.ts";
-import { isAllowed } from "./fnmatch.ts";
+import { isAllowed } from "./match.ts";
 import { startServer } from "./shared.ts";
 
 const config = loadConfig();

@@ -1,8 +1,9 @@
 import { join } from "@std/path";
+import type { Pattern } from "./match.ts";
 
 export interface Config {
-  allow: Record<string, string[]>;
-  deny?: Record<string, string[]>;
+  allow: Record<string, Pattern[]>;
+  deny?: Record<string, Pattern[]>;
   tokens?: string[];
 }
 
@@ -12,22 +13,32 @@ function configPath(): string {
   return join(home, ".config", "lima-escape", "config.json");
 }
 
+/** Validate a single pattern: string or array of (string | string[]). */
+function isValidPattern(x: unknown): x is Pattern {
+  if (typeof x === "string") return true;
+  if (!Array.isArray(x)) return false;
+  return x.every((el: unknown) => {
+    if (typeof el === "string") return true;
+    if (
+      Array.isArray(el) && el.every((s: unknown) => typeof s === "string")
+    ) return true;
+    return false;
+  });
+}
+
 function validateRuleSet(
   value: unknown,
   name: string,
-): asserts value is Record<string, string[]> {
+): asserts value is Record<string, Pattern[]> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error(
-      `Invalid config: "${name}" must be an object mapping cwd patterns to string arrays`,
+      `Invalid config: "${name}" must be an object mapping cwd patterns to pattern arrays`,
     );
   }
   for (const [key, arr] of Object.entries(value)) {
-    if (
-      !Array.isArray(arr) ||
-      !arr.every((x: unknown) => typeof x === "string")
-    ) {
+    if (!Array.isArray(arr) || !arr.every(isValidPattern)) {
       throw new Error(
-        `Invalid config: "${name}" key "${key}" must map to an array of strings`,
+        `Invalid config: "${name}" key "${key}" must map to an array of patterns (strings or arrays)`,
       );
     }
   }

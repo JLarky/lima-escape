@@ -31,8 +31,7 @@ const wf = workflow({
         { name: "Format check", run: "deno fmt --check" },
         {
           name: "Test",
-          run:
-            "deno test --allow-ffi --allow-net --allow-run --allow-read --allow-env",
+          run: "deno test --allow-net --allow-run --allow-read --allow-env",
         },
       ],
     },
