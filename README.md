@@ -114,7 +114,7 @@ specificity.
 ### 4. Start the server (on host)
 
 ```bash
-deno run --no-prompt --allow-env=HOME,LIMA_ESCAPE_TOKENS --allow-read=$HOME/.config/lima-escape --allow-net=0.0.0.0:27332 --allow-run=gh,git https://raw.githubusercontent.com/JLarky/lima-escape/refs/heads/main/server.ts
+deno run --no-prompt --allow-ffi --ignore-env --allow-env=HOME --allow-read=$HOME/.config/lima-escape,$HOME/vm --allow-net=0.0.0.0:27332 --allow-run=gh,git,say https://raw.githubusercontent.com/JLarky/lima-escape/refs/heads/main/server.ts
 ```
 
 Adjust `--allow-run` to only allow specific commands. Use `--allow-run=*` to
@@ -129,9 +129,10 @@ lima-escape --help     # full setup reference
 
 ## Permissions
 
-- **Server**: `--allow-run` (execute commands), `--allow-env=HOME` and
-  `--allow-read` (to read the config file), `--allow-net` (to listen for client
-  connections)
+- **Server**: `--allow-run` (execute commands), `--allow-ffi` (required by
+  Deno), `--ignore-env` (don't inherit host environment), `--allow-env=HOME` (to
+  find the config file), `--allow-read` (to read the config file), `--allow-net`
+  (to listen for client connections)
 - **Client**: `--allow-net` (to connect to the server), `--ignore-env` (change
   to --allow-env=LIMA_ESCAPE_HOST,LIMA_ESCAPE_PORT if you need to adjust that)
 

@@ -21,7 +21,7 @@ function loadClientToken(): string | null {
 
 if (import.meta.main) {
   const cmd =
-    `deno run --no-prompt --allow-env=HOME --allow-read=$HOME/.config/lima-escape --allow-net=0.0.0.0:27332 --allow-run=gh,git https://raw.githubusercontent.com/JLarky/lima-escape/refs/heads/main/server.ts`;
+    `deno run --no-prompt --allow-ffi --ignore-env --allow-env=HOME --allow-read=$HOME/.config/lima-escape,$HOME/vm --allow-net=0.0.0.0:27332 --allow-run=gh,git,say https://raw.githubusercontent.com/JLarky/lima-escape/refs/heads/main/server.ts`;
 
   if (
     Deno.args.length === 0 || Deno.args[0] === "--help" ||
@@ -152,7 +152,7 @@ Learn more at:
       const serverUrl =
         `https://raw.githubusercontent.com/JLarky/lima-escape/refs/heads/main/server.ts`;
       const serverCmd = (cmds: string[]) =>
-        `deno run --no-prompt --allow-env=HOME --allow-read=$HOME/.config/lima-escape --allow-net=0.0.0.0:${port} --allow-run=${
+        `deno run --no-prompt --allow-ffi --ignore-env --allow-env=HOME --allow-read=$HOME/.config/lima-escape,$HOME/vm --allow-net=0.0.0.0:${port} --allow-run=${
           cmds.join(",")
         } ${serverUrl}`;
       const configJson = JSON.stringify(

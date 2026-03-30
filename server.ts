@@ -1,4 +1,4 @@
-#!/usr/bin/env -S deno run --no-prompt --allow-run --allow-read --allow-net --allow-env=HOME,LIMA_ESCAPE_TOKENS
+#!/usr/bin/env -S deno run --no-prompt --allow-ffi --ignore-env --allow-run --allow-read --allow-net --allow-env=HOME
 import { loadConfig, loadTokens } from "./config.ts";
 import { isAllowed } from "./match.ts";
 import { startServer } from "./shared.ts";
