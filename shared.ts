@@ -13,7 +13,8 @@ export interface Request {
 }
 
 export interface StatusInfo {
-  allow: string[];
+  allow: Record<string, string[]>;
+  deny?: Record<string, string[]>;
   allowRun: Record<string, string>;
   pid: number;
 }
@@ -25,9 +26,12 @@ export interface Response {
   error?: string;
 }
 
+import type { AllowResult, Rules } from "./fnmatch.ts";
+
 export interface ServerOptions {
-  allow: string[];
-  isAllowed: (argv: string[], allowlist: string[]) => boolean;
+  allow: Record<string, string[]>;
+  deny?: Record<string, string[]>;
+  isAllowed: (argv: string[], cwd: string, rules: Rules) => AllowResult;
   port?: number;
 }
 
@@ -83,7 +87,11 @@ async function handleConnection(conn: Deno.Conn, opts: ServerOptions) {
     let res: Response;
 
     if (req.type === "status") {
-      const commands = [...new Set(opts.allow.map((p) => p.split(" ")[0]))];
+      const commands = [
+        ...new Set(
+          Object.values(opts.allow).flat().map((p) => p.split(" ")[0]),
+        ),
+      ];
       const allowRun: Record<string, string> = {};
       for (const cmd of commands) {
         try {
@@ -96,34 +104,43 @@ async function handleConnection(conn: Deno.Conn, opts: ServerOptions) {
           allowRun[cmd] = "unknown";
         }
       }
-      const status: StatusInfo = { allow: opts.allow, allowRun, pid: Deno.pid };
+      const status: StatusInfo = {
+        allow: opts.allow,
+        ...(opts.deny ? { deny: opts.deny } : {}),
+        allowRun,
+        pid: Deno.pid,
+      };
       res = { code: 0, stdout: JSON.stringify(status), stderr: "" };
       console.log("status request from client");
-    } else if (!opts.isAllowed(req.argv, opts.allow)) {
-      const cmd = req.argv.join(" ");
-      res = {
-        code: 1,
-        stdout: "",
-        stderr:
-          `denied: "${cmd}" does not match any allowed pattern\n\nRun \`lima-escape --help\` for setup instructions or \`lima-escape --status\` to see currently allowed patterns.`,
-        error: "denied",
-      };
-      console.log("denied:", cmd);
     } else {
-      const cmd = req.argv.join(" ");
-      console.log("executing:", cmd, "in", req.cwd);
-      try {
-        res = await executeCommand(req.argv, req.cwd);
-      } catch (e) {
+      const rules: Rules = { allow: opts.allow, deny: opts.deny };
+      const result = opts.isAllowed(req.argv, req.cwd, rules);
+      if (!result.allowed) {
+        const cmd = req.argv.join(" ");
         res = {
           code: 1,
           stdout: "",
-          stderr: `server error: ${e}`,
-          error: "server_error",
+          stderr:
+            `denied: ${result.reason}\n\nRun \`lima-escape --help\` for setup instructions or \`lima-escape --status\` to see currently allowed patterns.`,
+          error: "denied",
         };
-        console.error("error:", e);
+        console.log("denied:", cmd, "-", result.reason);
+      } else {
+        const cmd = req.argv.join(" ");
+        console.log("executing:", cmd, "in", req.cwd);
+        try {
+          res = await executeCommand(req.argv, req.cwd);
+        } catch (e) {
+          res = {
+            code: 1,
+            stdout: "",
+            stderr: `server error: ${e}`,
+            error: "server_error",
+          };
+          console.error("error:", e);
+        }
+        console.log("exit code:", res.code);
       }
-      console.log("exit code:", res.code);
     }
 
     await conn.write(new TextEncoder().encode(JSON.stringify(res)));

@@ -51,12 +51,16 @@ Setup:
 
      ${cmd}
 
-  5. Create a config file at ~/.config/lima-escape/config.json with an "allow"
-     array of glob patterns for allowed commands, e.g.:
+  5. Create a config file at ~/.config/lima-escape/config.json with allow/deny
+     rules scoped by directory, e.g.:
 
      {
-       "allow": ["gh pr view *", "git status"]
+       "allow": { "*": ["gh pr view *", "git status"] },
+       "deny": { "/sensitive": ["git *"] }
      }
+
+     Keys are directory patterns (fnmatch globs). "*" matches any directory.
+     Deny rules take precedence over allow rules.
 
 For LLM agents:
   When you are running inside a Lima VM some of the commands like \`gh\` might
@@ -96,8 +100,20 @@ Learn more at:
     }
     if (status?.allow) {
       console.log("Allowed patterns:");
-      for (const pattern of status.allow) {
-        console.log(`  ${pattern}`);
+      for (const [cwdPattern, patterns] of Object.entries(status.allow)) {
+        console.log(`  [cwd: ${cwdPattern}]`);
+        for (const pattern of patterns) {
+          console.log(`    ${pattern}`);
+        }
+      }
+      if (status.deny) {
+        console.log("\nDenied patterns:");
+        for (const [cwdPattern, patterns] of Object.entries(status.deny)) {
+          console.log(`  [cwd: ${cwdPattern}]`);
+          for (const pattern of patterns) {
+            console.log(`    ${pattern}`);
+          }
+        }
       }
       console.log("\nExecutable commands (--allow-run):");
       for (const [command, state] of Object.entries(status.allowRun)) {
@@ -110,14 +126,20 @@ Learn more at:
         `deno run --no-prompt --allow-ffi --allow-env=HOME --allow-read=$HOME/.config/lima-escape --allow-net=0.0.0.0:${port} --allow-run=${
           cmds.join(",")
         } ${serverUrl}`;
+      const configJson = JSON.stringify(
+        { allow: status.allow, ...(status.deny ? { deny: status.deny } : {}) },
+        null,
+        2,
+      );
       console.log(`
 For LLM agents:
   If a command is denied, ask the user to run these on the host machine:
 
-  1. Add a glob pattern to ~/.config/lima-escape/config.json:
-     { "allow": [${
-        status.allow.map((p) => `"${p}"`).join(", ")
-      }, "<new pattern>"] }
+  1. Edit ~/.config/lima-escape/config.json. Current config:
+     ${configJson.split("\n").join("\n     ")}
+
+     Keys are directory patterns ("*" = any dir). Add your pattern to the
+     appropriate cwd key in "allow", or add a "deny" key to block commands.
 
   2. Kill the running server and restart it with the new command in --allow-run:
      ${

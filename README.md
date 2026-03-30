@@ -11,16 +11,37 @@ you want to allow:
 
 ```json
 {
-  "allow": [
-    "gh pr view *",
-    "gh pr list *",
-    "git status",
-    "git log *"
-  ]
+  "allow": {
+    "*": [
+      "gh pr view *",
+      "gh pr list *",
+      "gh issue view *",
+      "gh issue list *",
+      "git status",
+      "git log *",
+      "git diff *"
+    ],
+    "/home/user/full-vibes": [
+      "git push -f",
+      "git push *"
+    ]
+  },
+  "deny": {
+    "*": [
+      "git push -f"
+    ],
+    "/home/user/prod-infra": [
+      "git *"
+    ]
+  }
 }
 ```
 
-Patterns use POSIX `fnmatch` glob syntax — `*` matches anything.
+Keys are directory patterns (POSIX `fnmatch` glob syntax). Use `"*"` to match
+any directory. Command patterns also use `fnmatch` — `*` matches anything.
+
+Deny rules take precedence over allow rules. A command is blocked if it matches
+any deny rule for the working directory, even if an allow rule would permit it.
 
 ### 2. Start the server (on host)
 

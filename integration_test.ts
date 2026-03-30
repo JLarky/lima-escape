@@ -1,17 +1,19 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { MAX_OUTPUT_SIZE, startClient, truncateOutput } from "./shared.ts";
-import { isAllowed } from "./fnmatch.ts";
+import { isAllowed, type Rules } from "./fnmatch.ts";
 import type { Request, Response } from "./shared.ts";
 
-const TEST_CONFIG = {
-  allow: [
-    "echo *",
-    "true",
-    "seq *",
-  ],
+const TEST_CONFIG: Rules = {
+  allow: {
+    "*": [
+      "echo *",
+      "true",
+      "seq *",
+    ],
+  },
 };
 
-async function handleConnection(conn: Deno.Conn, config: { allow: string[] }) {
+async function handleConnection(conn: Deno.Conn, config: Rules) {
   try {
     const buffer = new Uint8Array(65536);
     const bytesRead = await conn.read(buffer);
@@ -22,13 +24,12 @@ async function handleConnection(conn: Deno.Conn, config: { allow: string[] }) {
 
     let res: Response;
 
-    if (!isAllowed(req.argv, config.allow)) {
+    const result = isAllowed(req.argv, req.cwd, config);
+    if (!result.allowed) {
       res = {
         code: 1,
         stdout: "",
-        stderr: `denied: "${
-          req.argv.join(" ")
-        }" does not match any allowed pattern`,
+        stderr: `denied: ${result.reason}`,
         error: "denied",
       };
     } else {
@@ -59,7 +60,7 @@ async function handleConnection(conn: Deno.Conn, config: { allow: string[] }) {
 let nextPort = 17332;
 
 async function withServer(
-  config: { allow: string[] },
+  config: Rules,
   fn: (port: number) => Promise<void>,
 ) {
   const port = nextPort++;
