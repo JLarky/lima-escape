@@ -55,26 +55,66 @@ rules scoped by directory:
   "tokens": ["<paste token from lima-escape --auth>"],
   "allow": {
     "*": [
-      "gh pr view *",
-      "gh pr list *",
-      "gh issue view *",
-      "gh issue list *"
+      "say *",
+      ["gh", "pr", ["list", "view", "checks"], "*"],
+      ["gh", "issue", ["create", "edit", "list", "view"], "*"],
+      "git status",
+      "git log *",
+      "git diff *"
+    ],
+    "/home/user/full-vibes": [
+      "git push *"
     ]
   },
   "deny": {
-    "/home/user/prod-infra": ["gh *"]
+    "*": ["git push -f"],
+    "/home/user/prod-infra": ["git *", "gh *"]
   }
 }
 ```
 
-Keys are directory patterns (POSIX `fnmatch` glob syntax). Use `"*"` to match
-any directory. Command patterns also use `fnmatch` — `*` matches anything. Deny
-rules take precedence over allow rules.
+#### Command patterns
+
+Two formats are supported:
+
+**String patterns** (sugar for simple cases):
+
+```json
+{ "allow": { "*": ["gh pr", "gh pr *", "git status"] } }
+```
+
+- `"gh pr"` — exact match, only `gh pr` with no trailing args
+- `"gh pr *"` — zero or more trailing args (matches `gh pr`, `gh pr view 123`,
+  etc.)
+- Tokens are matched with `===`, no glob/regex
+
+**Array patterns** (for alternatives):
+
+```json
+{ "allow": { "*": [["gh", ["pr", "issue"], "*"], ["git", "status"]] } }
+```
+
+- `["gh", "pr"]` — exact match (same as `"gh pr"`)
+- `["gh", "pr", "*"]` — zero or more trailing args (same as `"gh pr *"`)
+- `["gh", ["pr", "issue"], "*"]` — alternatives: matches `gh pr ...` or
+  `gh issue ...`
+
+Fail-closed: forgetting `*` gives less access, not more.
+
+#### CWD patterns
+
+Keys in allow/deny objects are directory patterns:
+
+- `"*"` — matches any working directory
+- `"/home/user/project"` — exact match or any subdirectory (prefix matching)
+
+More specific paths override less specific ones. Deny rules break ties at equal
+specificity.
 
 ### 4. Start the server (on host)
 
 ```bash
-deno run --no-prompt --allow-ffi --allow-env=HOME,LIMA_ESCAPE_TOKENS --allow-read=$HOME/.config/lima-escape --allow-net=0.0.0.0:27332 --allow-run=gh,git https://raw.githubusercontent.com/JLarky/lima-escape/refs/heads/main/server.ts
+deno run --no-prompt --allow-env=HOME,LIMA_ESCAPE_TOKENS --allow-read=$HOME/.config/lima-escape --allow-net=0.0.0.0:27332 --allow-run=gh,git https://raw.githubusercontent.com/JLarky/lima-escape/refs/heads/main/server.ts
 ```
 
 Adjust `--allow-run` to only allow specific commands. Use `--allow-run=*` to
@@ -89,9 +129,9 @@ lima-escape --help     # full setup reference
 
 ## Permissions
 
-- **Server**: `--allow-run` (execute commands), `--allow-ffi` (for fnmatch),
-  `--allow-env=HOME` and `--allow-read` (to read the config file), `--allow-net`
-  (to listen for client connections)
+- **Server**: `--allow-run` (execute commands), `--allow-env=HOME` and
+  `--allow-read` (to read the config file), `--allow-net` (to listen for client
+  connections)
 - **Client**: `--allow-net` (to connect to the server), `--ignore-env` (change
   to --allow-env=LIMA_ESCAPE_HOST,LIMA_ESCAPE_PORT if you need to adjust that)
 
@@ -99,7 +139,7 @@ lima-escape --help     # full setup reference
 
 1. **Token auth**: clients must present a token from `config.json` — without it,
    exec requests are rejected
-2. **Allowlist**: only commands matching `fnmatch` patterns in config execute
+2. **Allowlist**: only commands matching token-based patterns in config execute
 3. **No shell**: always `Deno.Command` with argv array, never `sh -c`
 4. **Argv-in, argv-out**: client sends pre-split argv from the OS, server
    executes as argv — no string splitting

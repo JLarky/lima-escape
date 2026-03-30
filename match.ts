@@ -83,10 +83,26 @@ function matchToken(token: string | string[], value: string): boolean {
   return token === value;
 }
 
-/** Format a pattern for display in error messages. */
-function formatPattern(pattern: Pattern): string {
-  if (typeof pattern === "string") return `"${pattern}"`;
+/**
+ * Pretty-print a pattern for display.
+ * - Strings print as-is: "gh pr *"
+ * - Arrays that are all plain strings (1:1 with string form) print as string: "gh pr *"
+ * - Arrays containing sub-arrays print as JSON array: ["gh",["pr","issue"],"*"]
+ */
+export function prettyPrintPattern(pattern: Pattern): string {
+  if (typeof pattern === "string") return pattern;
+  const hasAlternatives = pattern.some((el) => Array.isArray(el));
+  if (!hasAlternatives) return (pattern as string[]).join(" ");
   return JSON.stringify(pattern);
+}
+
+/** Format a pattern for display in error messages (with quotes). */
+function formatPattern(pattern: Pattern): string {
+  const pp = prettyPrintPattern(pattern);
+  if (typeof pattern === "string" || !pattern.some((el) => Array.isArray(el))) {
+    return `"${pp}"`;
+  }
+  return pp;
 }
 
 export function isAllowed(
@@ -94,8 +110,6 @@ export function isAllowed(
   cwd: string,
   rules: Rules,
 ): AllowResult {
-  const command = argv.join(" ");
-
   // Collect all matching rules with their specificity and type
   type Match = {
     type: "allow" | "deny";
@@ -144,7 +158,7 @@ export function isAllowed(
     const hint = findHint(argv, rules);
     return {
       allowed: false,
-      reason: `"${command}" does not match any allowed pattern`,
+      reason: `"${argv.join(" ")}" does not match any allowed pattern`,
       ...(hint ? { hint } : {}),
     };
   }

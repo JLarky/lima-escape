@@ -17,10 +17,11 @@ function configPath(): string {
 function isValidPattern(x: unknown): x is Pattern {
   if (typeof x === "string") return true;
   if (!Array.isArray(x)) return false;
-  return x.every((el: unknown) => {
+  return (x as unknown[]).every((el) => {
     if (typeof el === "string") return true;
     if (
-      Array.isArray(el) && el.every((s: unknown) => typeof s === "string")
+      Array.isArray(el) &&
+      (el as unknown[]).every((s) => typeof s === "string")
     ) return true;
     return false;
   });

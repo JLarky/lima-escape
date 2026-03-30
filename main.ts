@@ -1,4 +1,5 @@
 #!/usr/bin/env -S deno run --no-prompt --allow-net --allow-env=HOME,LIMA_ESCAPE_HOST,LIMA_ESCAPE_PORT,LIMA_ESCAPE_TOKEN --allow-read --allow-write
+import { prettyPrintPattern } from "./match.ts";
 import { DEFAULT_PORT, startClient, type StatusInfo } from "./shared.ts";
 
 function tokenPath(): string {
@@ -20,7 +21,7 @@ function loadClientToken(): string | null {
 
 if (import.meta.main) {
   const cmd =
-    `deno run --no-prompt --allow-ffi --allow-env=HOME --allow-read=$HOME/.config/lima-escape --allow-net=0.0.0.0:27332 --allow-run=gh,git https://raw.githubusercontent.com/JLarky/lima-escape/refs/heads/main/server.ts`;
+    `deno run --no-prompt --allow-env=HOME --allow-read=$HOME/.config/lima-escape --allow-net=0.0.0.0:27332 --allow-run=gh,git https://raw.githubusercontent.com/JLarky/lima-escape/refs/heads/main/server.ts`;
 
   if (
     Deno.args.length === 0 || Deno.args[0] === "--help" ||
@@ -78,11 +79,10 @@ Setup:
        "deny": { "/sensitive": ["git *"] }
      }
 
-     Keys are directory patterns (fnmatch globs). "*" matches any directory.
-     Deny rules take precedence over allow rules. Note: cwd deny rules are
-     organizational — commands can still have global effects via their own
-     flags (e.g. git -C, gh --repo). Use command patterns as the primary
-     security boundary.
+     Keys are directory patterns. "*" matches any directory; paths use prefix
+     matching (e.g. "/home/user" matches "/home/user/sub"). Command patterns
+     use exact token matching — "gh pr *" means gh + pr + zero or more args.
+     Deny rules take precedence over allow rules at equal specificity.
 
   6. Authenticate from the VM:
 
@@ -132,7 +132,7 @@ Learn more at:
       for (const [cwdPattern, patterns] of Object.entries(status.allow)) {
         console.log(`  [cwd: ${cwdPattern}]`);
         for (const pattern of patterns) {
-          console.log(`    ${pattern}`);
+          console.log(`    ${prettyPrintPattern(pattern)}`);
         }
       }
       if (status.deny) {
@@ -140,7 +140,7 @@ Learn more at:
         for (const [cwdPattern, patterns] of Object.entries(status.deny)) {
           console.log(`  [cwd: ${cwdPattern}]`);
           for (const pattern of patterns) {
-            console.log(`    ${pattern}`);
+            console.log(`    ${prettyPrintPattern(pattern)}`);
           }
         }
       }
@@ -152,7 +152,7 @@ Learn more at:
       const serverUrl =
         `https://raw.githubusercontent.com/JLarky/lima-escape/refs/heads/main/server.ts`;
       const serverCmd = (cmds: string[]) =>
-        `deno run --no-prompt --allow-ffi --allow-env=HOME --allow-read=$HOME/.config/lima-escape --allow-net=0.0.0.0:${port} --allow-run=${
+        `deno run --no-prompt --allow-env=HOME --allow-read=$HOME/.config/lima-escape --allow-net=0.0.0.0:${port} --allow-run=${
           cmds.join(",")
         } ${serverUrl}`;
       const configJson = JSON.stringify(
