@@ -1,5 +1,10 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { MAX_OUTPUT_SIZE, startClient, truncateOutput } from "./shared.ts";
+import {
+  MAX_OUTPUT_SIZE,
+  startClient,
+  truncateOutput,
+  validateCwd,
+} from "./shared.ts";
 import { isAllowed, type Rules } from "./fnmatch.ts";
 import type { Request, Response } from "./shared.ts";
 
@@ -303,4 +308,40 @@ Deno.test("auth: exec with wrong token returns auth_required", async () => {
     assertEquals(res.code, 1);
     assertEquals(res.error, "auth_required");
   });
+});
+
+// --- cwd validation tests ---
+
+Deno.test("validateCwd: rejects relative path", async () => {
+  const result = await validateCwd("relative/path");
+  assertEquals("error" in result, true);
+  if ("error" in result) {
+    assertStringIncludes(result.error, "absolute path");
+  }
+});
+
+Deno.test("validateCwd: rejects non-existent path", async () => {
+  const result = await validateCwd("/nonexistent/path/that/does/not/exist");
+  assertEquals("error" in result, true);
+  if ("error" in result) {
+    assertStringIncludes(result.error, "does not exist");
+  }
+});
+
+Deno.test("validateCwd: accepts valid directory", async () => {
+  const result = await validateCwd("/tmp");
+  assertEquals("error" in result, false);
+  if ("resolved" in result) {
+    // resolved path should be absolute
+    assertEquals(result.resolved.startsWith("/"), true);
+  }
+});
+
+Deno.test("validateCwd: resolves path traversal", async () => {
+  const result = await validateCwd("/tmp/../tmp");
+  assertEquals("error" in result, false);
+  if ("resolved" in result) {
+    // should be normalized — no ".." in resolved path
+    assertEquals(result.resolved.includes(".."), false);
+  }
 });

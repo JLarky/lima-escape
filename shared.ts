@@ -50,6 +50,24 @@ export function truncateOutput(
   };
 }
 
+export async function validateCwd(
+  cwd: string,
+): Promise<{ resolved: string } | { error: string }> {
+  if (!cwd.startsWith("/")) {
+    return { error: `cwd must be an absolute path, got: "${cwd}"` };
+  }
+  try {
+    const resolved = await Deno.realPath(cwd);
+    const stat = await Deno.stat(resolved);
+    if (!stat.isDirectory) {
+      return { error: `cwd is not a directory: "${cwd}"` };
+    }
+    return { resolved };
+  } catch {
+    return { error: `cwd does not exist on host: "${cwd}"` };
+  }
+}
+
 async function executeCommand(argv: string[], cwd: string): Promise<Response> {
   const command = new Deno.Command(argv[0], { args: argv.slice(1), cwd });
   const { code, stdout, stderr } = await command.output();
@@ -127,33 +145,45 @@ async function handleConnection(conn: Deno.Conn, opts: ServerOptions) {
         };
         console.log("rejected: invalid or missing auth token");
       } else {
-        const rules: Rules = { allow: opts.allow, deny: opts.deny };
-        const result = opts.isAllowed(req.argv, req.cwd, rules);
-        if (!result.allowed) {
-          const cmd = req.argv.join(" ");
+        const cwdResult = await validateCwd(req.cwd);
+        if ("error" in cwdResult) {
           res = {
             code: 1,
             stdout: "",
-            stderr:
-              `denied: ${result.reason}\n\nRun \`lima-escape --help\` for setup instructions or \`lima-escape --status\` to see currently allowed patterns.`,
-            error: "denied",
+            stderr: `invalid cwd: ${cwdResult.error}`,
+            error: "invalid_cwd",
           };
-          console.log("denied:", cmd, "-", result.reason);
+          console.log("rejected: invalid cwd -", cwdResult.error);
         } else {
-          const cmd = req.argv.join(" ");
-          console.log("executing:", cmd, "in", req.cwd);
-          try {
-            res = await executeCommand(req.argv, req.cwd);
-          } catch (e) {
+          const cwd = cwdResult.resolved;
+          const rules: Rules = { allow: opts.allow, deny: opts.deny };
+          const result = opts.isAllowed(req.argv, cwd, rules);
+          if (!result.allowed) {
+            const cmd = req.argv.join(" ");
             res = {
               code: 1,
               stdout: "",
-              stderr: `server error: ${e}`,
-              error: "server_error",
+              stderr:
+                `denied: ${result.reason}\n\nRun \`lima-escape --help\` for setup instructions or \`lima-escape --status\` to see currently allowed patterns.`,
+              error: "denied",
             };
-            console.error("error:", e);
+            console.log("denied:", cmd, "-", result.reason);
+          } else {
+            const cmd = req.argv.join(" ");
+            console.log("executing:", cmd, "in", cwd);
+            try {
+              res = await executeCommand(req.argv, cwd);
+            } catch (e) {
+              res = {
+                code: 1,
+                stdout: "",
+                stderr: `server error: ${e}`,
+                error: "server_error",
+              };
+              console.error("error:", e);
+            }
+            console.log("exit code:", res.code);
           }
-          console.log("exit code:", res.code);
         }
       }
     }
