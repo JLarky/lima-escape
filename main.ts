@@ -226,7 +226,7 @@ For LLM agents:
 
   let res;
   try {
-    console.log(
+    console.error(
       "Attempting to run a command using github.com/JLarky/lima-escape",
     );
     res = await startClient(hostname, port, Deno.args, undefined, token);
