@@ -181,3 +181,126 @@ Deno.test("integration: client gives useful error on connection refused", async 
     assertEquals(e instanceof Deno.errors.ConnectionRefused, true);
   }
 });
+
+// --- Auth tests ---
+
+const TEST_TOKEN = "test-token-for-integration";
+
+async function handleAuthConnection(
+  conn: Deno.Conn,
+  config: Rules,
+  checkToken: (token: string) => boolean,
+) {
+  try {
+    const buffer = new Uint8Array(65536);
+    const bytesRead = await conn.read(buffer);
+    if (!bytesRead) return;
+
+    const message = new TextDecoder().decode(buffer.subarray(0, bytesRead));
+    const req: Request = JSON.parse(message);
+
+    let res: Response;
+
+    if (!checkToken(req.token ?? "")) {
+      res = {
+        code: 1,
+        stdout: "",
+        stderr: "Authentication required.",
+        error: "auth_required",
+      };
+    } else {
+      const result = isAllowed(req.argv, req.cwd, config);
+      if (!result.allowed) {
+        res = {
+          code: 1,
+          stdout: "",
+          stderr: `denied: ${result.reason}`,
+          error: "denied",
+        };
+      } else {
+        const command = new Deno.Command(req.argv[0], {
+          args: req.argv.slice(1),
+          cwd: req.cwd,
+        });
+        const out = await command.output();
+        const stdoutLimit = Math.floor(MAX_OUTPUT_SIZE / 2);
+        const stderrLimit = MAX_OUTPUT_SIZE - stdoutLimit;
+        res = {
+          code: out.code,
+          stdout:
+            truncateOutput(new TextDecoder().decode(out.stdout), stdoutLimit)
+              .text,
+          stderr:
+            truncateOutput(new TextDecoder().decode(out.stderr), stderrLimit)
+              .text,
+        };
+      }
+    }
+
+    await conn.write(new TextEncoder().encode(JSON.stringify(res)));
+  } finally {
+    conn.close();
+  }
+}
+
+async function withAuthServerReal(
+  config: Rules,
+  fn: (port: number) => Promise<void>,
+) {
+  const port = nextPort++;
+  const checkToken = (token: string) => token === TEST_TOKEN;
+  const listener = Deno.listen({ port, hostname: "127.0.0.1" });
+
+  const serverLoop = (async () => {
+    try {
+      for await (const conn of listener) {
+        handleAuthConnection(conn, config, checkToken).catch(() => {});
+      }
+    } catch {
+      // listener closed
+    }
+  })();
+
+  try {
+    await fn(port);
+  } finally {
+    listener.close();
+    await serverLoop;
+  }
+}
+
+Deno.test("auth: exec without token returns auth_required", async () => {
+  await withAuthServerReal(TEST_CONFIG, async (port) => {
+    const res = await startClient("127.0.0.1", port, ["echo", "hello"]);
+    assertEquals(res.code, 1);
+    assertEquals(res.error, "auth_required");
+  });
+});
+
+Deno.test("auth: exec with valid token succeeds", async () => {
+  await withAuthServerReal(TEST_CONFIG, async (port) => {
+    const res = await startClient(
+      "127.0.0.1",
+      port,
+      ["echo", "hello world"],
+      undefined,
+      TEST_TOKEN,
+    );
+    assertEquals(res.code, 0);
+    assertEquals(res.stdout.trim(), "hello world");
+  });
+});
+
+Deno.test("auth: exec with wrong token returns auth_required", async () => {
+  await withAuthServerReal(TEST_CONFIG, async (port) => {
+    const res = await startClient(
+      "127.0.0.1",
+      port,
+      ["echo", "hello"],
+      undefined,
+      "wrong-token",
+    );
+    assertEquals(res.code, 1);
+    assertEquals(res.error, "auth_required");
+  });
+});

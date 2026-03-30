@@ -1,5 +1,22 @@
-#!/usr/bin/env -S deno run --no-prompt --allow-net --ignore-env
+#!/usr/bin/env -S deno run --no-prompt --allow-net --allow-env=HOME,LIMA_ESCAPE_HOST,LIMA_ESCAPE_PORT,LIMA_ESCAPE_TOKEN --allow-read --allow-write
 import { DEFAULT_PORT, startClient, type StatusInfo } from "./shared.ts";
+
+function tokenPath(): string {
+  const home = Deno.env.get("HOME");
+  if (!home) throw new Error("HOME not set");
+  return home + "/.lima-escape-token";
+}
+
+function loadClientToken(): string | null {
+  const envToken = Deno.env.get("LIMA_ESCAPE_TOKEN");
+  if (envToken) return envToken;
+  try {
+    const token = Deno.readTextFileSync(tokenPath()).trim();
+    return token || null;
+  } catch {
+    return null;
+  }
+}
 
 if (import.meta.main) {
   const cmd =
@@ -14,6 +31,7 @@ if (import.meta.main) {
 
 Usage:
   lima-escape <command> [args...]
+  lima-escape --auth             Authenticate with the server
   lima-escape --help
   lima-escape --status
 
@@ -55,12 +73,20 @@ Setup:
      rules scoped by directory, e.g.:
 
      {
+       "tokens": ["<paste token from step 6>"],
        "allow": { "*": ["gh pr view *", "git status"] },
        "deny": { "/sensitive": ["git *"] }
      }
 
      Keys are directory patterns (fnmatch globs). "*" matches any directory.
      Deny rules take precedence over allow rules.
+
+  6. Authenticate from the VM:
+
+     lima-escape --auth
+
+     This generates a token and saves it to ~/.lima-escape-token.
+     Copy the printed token into the "tokens" array in your host config.
 
 For LLM agents:
   When you are running inside a Lima VM some of the commands like \`gh\` might
@@ -164,12 +190,41 @@ For LLM agents:
     Deno.exit(0);
   }
 
+  if (Deno.args[0] === "--auth") {
+    const existing = loadClientToken();
+    if (existing && !Deno.args.includes("--force")) {
+      console.log("Already authenticated. Token found at", tokenPath());
+      console.log("Run `lima-escape --auth --force` to re-authenticate.");
+      Deno.exit(0);
+    }
+
+    const token = crypto.randomUUID();
+    Deno.writeTextFileSync(tokenPath(), token + "\n", { mode: 0o600 });
+    console.log(`Token saved to ${tokenPath()}\n`);
+    console.log(
+      `Add this token to your host config (~/.config/lima-escape/config.json):`,
+    );
+    console.log(`\n  "tokens": ["${token}"]`);
+    console.log(
+      `\nThen restart the server (or it will pick up the new token on the next request).`,
+    );
+    Deno.exit(0);
+  }
+
+  const token = loadClientToken();
+  if (!token) {
+    console.error(
+      "Not authenticated. Run `lima-escape --auth` to generate a token.",
+    );
+    Deno.exit(1);
+  }
+
   let res;
   try {
     console.log(
       "Attempting to run a command using github.com/JLarky/lima-escape",
     );
-    res = await startClient(hostname, port, Deno.args);
+    res = await startClient(hostname, port, Deno.args, undefined, token);
   } catch (e) {
     if (e instanceof Deno.errors.ConnectionRefused) {
       console.error(

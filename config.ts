@@ -3,6 +3,7 @@ import { join } from "jsr:@std/path";
 export interface Config {
   allow: Record<string, string[]>;
   deny?: Record<string, string[]>;
+  tokens?: string[];
 }
 
 function configPath(): string {
@@ -52,6 +53,30 @@ export function loadConfig(path?: string): Config {
   if (raw.deny !== undefined) {
     validateRuleSet(raw.deny, "deny");
   }
+  if (raw.tokens !== undefined) {
+    if (
+      !Array.isArray(raw.tokens) ||
+      !raw.tokens.every((x: unknown) => typeof x === "string")
+    ) {
+      throw new Error('Invalid config: "tokens" must be an array of strings');
+    }
+  }
 
-  return { allow: raw.allow, ...(raw.deny ? { deny: raw.deny } : {}) };
+  return {
+    allow: raw.allow,
+    ...(raw.deny ? { deny: raw.deny } : {}),
+    ...(raw.tokens ? { tokens: raw.tokens } : {}),
+  };
+}
+
+/** Re-read just the tokens array from config (for hot-reload on each request). */
+export function loadTokens(path?: string): string[] {
+  const p = path ?? configPath();
+  try {
+    const raw = JSON.parse(Deno.readTextFileSync(p));
+    if (Array.isArray(raw.tokens)) return raw.tokens;
+    return [];
+  } catch {
+    return [];
+  }
 }

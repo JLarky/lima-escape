@@ -10,13 +10,14 @@ export interface Request {
   type?: "exec" | "status";
   argv: string[];
   cwd: string;
+  token?: string;
 }
 
 export interface StatusInfo {
   allow: Record<string, string[]>;
   deny?: Record<string, string[]>;
   allowRun: Record<string, string>;
-  pid: number;
+  pid?: number;
 }
 
 export interface Response {
@@ -33,6 +34,7 @@ export interface ServerOptions {
   deny?: Record<string, string[]>;
   isAllowed: (argv: string[], cwd: string, rules: Rules) => AllowResult;
   port?: number;
+  checkToken?: (token: string) => boolean;
 }
 
 export function truncateOutput(
@@ -104,42 +106,55 @@ async function handleConnection(conn: Deno.Conn, opts: ServerOptions) {
           allowRun[cmd] = "unknown";
         }
       }
+      const authenticated = !opts.checkToken ||
+        opts.checkToken(req.token ?? "");
       const status: StatusInfo = {
         allow: opts.allow,
         ...(opts.deny ? { deny: opts.deny } : {}),
         allowRun,
-        pid: Deno.pid,
+        ...(authenticated ? { pid: Deno.pid } : {}),
       };
       res = { code: 0, stdout: JSON.stringify(status), stderr: "" };
       console.log("status request from client");
     } else {
-      const rules: Rules = { allow: opts.allow, deny: opts.deny };
-      const result = opts.isAllowed(req.argv, req.cwd, rules);
-      if (!result.allowed) {
-        const cmd = req.argv.join(" ");
+      if (opts.checkToken && !opts.checkToken(req.token ?? "")) {
         res = {
           code: 1,
           stdout: "",
           stderr:
-            `denied: ${result.reason}\n\nRun \`lima-escape --help\` for setup instructions or \`lima-escape --status\` to see currently allowed patterns.`,
-          error: "denied",
+            `Authentication required. Run \`lima-escape --auth\` to generate a token, then add it to your host config.`,
+          error: "auth_required",
         };
-        console.log("denied:", cmd, "-", result.reason);
+        console.log("rejected: invalid or missing auth token");
       } else {
-        const cmd = req.argv.join(" ");
-        console.log("executing:", cmd, "in", req.cwd);
-        try {
-          res = await executeCommand(req.argv, req.cwd);
-        } catch (e) {
+        const rules: Rules = { allow: opts.allow, deny: opts.deny };
+        const result = opts.isAllowed(req.argv, req.cwd, rules);
+        if (!result.allowed) {
+          const cmd = req.argv.join(" ");
           res = {
             code: 1,
             stdout: "",
-            stderr: `server error: ${e}`,
-            error: "server_error",
+            stderr:
+              `denied: ${result.reason}\n\nRun \`lima-escape --help\` for setup instructions or \`lima-escape --status\` to see currently allowed patterns.`,
+            error: "denied",
           };
-          console.error("error:", e);
+          console.log("denied:", cmd, "-", result.reason);
+        } else {
+          const cmd = req.argv.join(" ");
+          console.log("executing:", cmd, "in", req.cwd);
+          try {
+            res = await executeCommand(req.argv, req.cwd);
+          } catch (e) {
+            res = {
+              code: 1,
+              stdout: "",
+              stderr: `server error: ${e}`,
+              error: "server_error",
+            };
+            console.error("error:", e);
+          }
+          console.log("exit code:", res.code);
         }
-        console.log("exit code:", res.code);
       }
     }
 
@@ -154,11 +169,12 @@ export async function startClient(
   port: number,
   argv: string[],
   type?: "exec" | "status",
+  token?: string,
 ): Promise<Response> {
   const conn = await Deno.connect({ hostname, port });
 
   try {
-    const req: Request = { type, argv, cwd: Deno.cwd() };
+    const req: Request = { type, argv, cwd: Deno.cwd(), token };
     await conn.write(new TextEncoder().encode(JSON.stringify(req)));
 
     // Read all chunks until connection closes, up to MAX_RESPONSE_SIZE

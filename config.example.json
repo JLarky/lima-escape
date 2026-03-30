@@ -1,4 +1,5 @@
 {
+  "tokens": [],
   "allow": {
     "*": [
       "gh pr view *",

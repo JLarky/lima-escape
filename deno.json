@@ -1,7 +1,7 @@
 {
   "tasks": {
-    "server": "deno run --no-prompt --allow-run --allow-read --allow-ffi --allow-net --allow-env=HOME server.ts",
-    "client": "deno run --no-prompt --allow-net --ignore-env main.ts"
+    "server": "deno run --no-prompt --allow-run --allow-read --allow-ffi --allow-net --allow-env=HOME,LIMA_ESCAPE_TOKENS server.ts",
+    "client": "deno run --no-prompt --allow-net --allow-env=HOME,LIMA_ESCAPE_HOST,LIMA_ESCAPE_PORT,LIMA_ESCAPE_TOKEN --allow-read --allow-write main.ts"
   },
   "imports": {
     "@std/assert": "jsr:@std/assert@1",
