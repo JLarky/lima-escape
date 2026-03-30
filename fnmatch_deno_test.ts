@@ -1,11 +1,5 @@
 import { assertEquals } from "@std/assert";
-import {
-  cwdSpecificity,
-  fnmatch,
-  isAllowed,
-  matchCommand,
-  type Rules,
-} from "./fnmatch.ts";
+import { cwdSpecificity, fnmatch, isAllowed, type Rules } from "./fnmatch.ts";
 
 // POSIX fnmatch flags — values are from glibc fnmatch.h
 const FNM_PATHNAME = 0x01;
