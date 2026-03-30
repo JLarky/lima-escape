@@ -14,8 +14,8 @@ export interface Request {
 }
 
 export interface StatusInfo {
-  allow: Record<string, string[]>;
-  deny?: Record<string, string[]>;
+  allow: Record<string, Pattern[]>;
+  deny?: Record<string, Pattern[]>;
   allowRun: Record<string, string>;
   pid?: number;
 }
@@ -27,11 +27,11 @@ export interface Response {
   error?: string;
 }
 
-import type { AllowResult, Rules } from "./fnmatch.ts";
+import type { AllowResult, Pattern, Rules } from "./match.ts";
 
 export interface ServerOptions {
-  allow: Record<string, string[]>;
-  deny?: Record<string, string[]>;
+  allow: Record<string, Pattern[]>;
+  deny?: Record<string, Pattern[]>;
   isAllowed: (argv: string[], cwd: string, rules: Rules) => AllowResult;
   port?: number;
   checkToken?: (token: string) => boolean;
@@ -109,7 +109,12 @@ async function handleConnection(conn: Deno.Conn, opts: ServerOptions) {
     if (req.type === "status") {
       const commands = [
         ...new Set(
-          Object.values(opts.allow).flat().map((p) => p.split(" ")[0]),
+          Object.values(opts.allow).flat().flatMap((p) => {
+            if (typeof p === "string") return [p.split(" ")[0]];
+            const first = p[0];
+            if (typeof first === "string") return [first];
+            return first; // string[] alternatives — all are possible commands
+          }),
         ),
       ];
       const allowRun: Record<string, string> = {};
@@ -160,11 +165,12 @@ async function handleConnection(conn: Deno.Conn, opts: ServerOptions) {
           const result = opts.isAllowed(req.argv, cwd, rules);
           if (!result.allowed) {
             const cmd = req.argv.join(" ");
+            const hint = result.hint ? `\nhint: ${result.hint}` : "";
             res = {
               code: 1,
               stdout: "",
               stderr:
-                `denied: ${result.reason}\n\nRun \`lima-escape --help\` for setup instructions or \`lima-escape --status\` to see currently allowed patterns.`,
+                `denied: ${result.reason}${hint}\n\nRun \`lima-escape --help\` for setup instructions or \`lima-escape --status\` to see currently allowed patterns.`,
               error: "denied",
             };
             console.log("denied:", cmd, "-", result.reason);

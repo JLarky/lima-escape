@@ -5,7 +5,7 @@ import {
   truncateOutput,
   validateCwd,
 } from "./shared.ts";
-import { isAllowed, type Rules } from "./fnmatch.ts";
+import { isAllowed, type Rules } from "./match.ts";
 import type { Request, Response } from "./shared.ts";
 
 const TEST_CONFIG: Rules = {

@@ -1,37 +1,127 @@
 import { assertEquals } from "@std/assert";
-import { cwdSpecificity, fnmatch, isAllowed, type Rules } from "./fnmatch.ts";
+import {
+  cwdMatches,
+  cwdSpecificity,
+  isAllowed,
+  matchCommand,
+  type Rules,
+} from "./match.ts";
 
-// POSIX fnmatch flags — values are from glibc fnmatch.h
-const FNM_PATHNAME = 0x01;
+// --- String pattern matching ---
 
-// --- Basic fnmatch behavior ---
-
-Deno.test("fnmatch: exact match", () => {
-  assertEquals(fnmatch("gh pr view", "gh pr view"), true);
+Deno.test("matchCommand: exact string match", () => {
+  assertEquals(matchCommand("gh pr view", ["gh", "pr", "view"]), true);
 });
 
-Deno.test("fnmatch: exact mismatch", () => {
-  assertEquals(fnmatch("gh pr view", "gh pr create"), false);
+Deno.test("matchCommand: exact string mismatch", () => {
+  assertEquals(matchCommand("gh pr view", ["gh", "pr", "create"]), false);
 });
 
-Deno.test("fnmatch: wildcard matches trailing args", () => {
-  assertEquals(fnmatch("gh pr view *", "gh pr view 123"), true);
+Deno.test("matchCommand: trailing * matches zero extra args", () => {
+  assertEquals(matchCommand("gh pr *", ["gh", "pr"]), true);
 });
 
-Deno.test("fnmatch: wildcard matches multiple trailing args", () => {
-  assertEquals(fnmatch("gh pr view *", "gh pr view 123 --web"), true);
+Deno.test("matchCommand: trailing * matches one extra arg", () => {
+  assertEquals(matchCommand("gh pr *", ["gh", "pr", "view"]), true);
 });
 
-Deno.test("fnmatch: wildcard does NOT match no args (space required)", () => {
-  assertEquals(fnmatch("gh pr view *", "gh pr view"), false);
+Deno.test("matchCommand: trailing * matches multiple extra args", () => {
+  assertEquals(
+    matchCommand("gh pr *", ["gh", "pr", "view", "123", "--web"]),
+    true,
+  );
 });
 
-Deno.test("fnmatch: pattern without wildcard rejects extra args", () => {
-  assertEquals(fnmatch("gh pr view", "gh pr view 123"), false);
+Deno.test("matchCommand: no trailing * rejects extra args", () => {
+  assertEquals(matchCommand("git status", ["git", "status", "--short"]), false);
 });
 
-Deno.test("fnmatch: wildcard does not match different subcommand", () => {
-  assertEquals(fnmatch("gh pr view *", "gh pr create 123"), false);
+Deno.test("matchCommand: trailing * does not match different prefix", () => {
+  assertEquals(matchCommand("gh pr *", ["gh", "issue", "view"]), false);
+});
+
+Deno.test("matchCommand: empty argv returns false", () => {
+  assertEquals(matchCommand("gh pr", []), false);
+});
+
+Deno.test("matchCommand: single command exact match", () => {
+  assertEquals(matchCommand("true", ["true"]), true);
+});
+
+Deno.test("matchCommand: single command with trailing * matches bare command", () => {
+  assertEquals(matchCommand("echo *", ["echo"]), true);
+});
+
+// --- Array pattern matching ---
+
+Deno.test("matchCommand: array exact match", () => {
+  assertEquals(matchCommand(["gh", "pr"], ["gh", "pr"]), true);
+});
+
+Deno.test("matchCommand: array with trailing *", () => {
+  assertEquals(matchCommand(["gh", "pr", "*"], ["gh", "pr", "view"]), true);
+});
+
+Deno.test("matchCommand: array trailing * matches zero extra args", () => {
+  assertEquals(matchCommand(["gh", "pr", "*"], ["gh", "pr"]), true);
+});
+
+Deno.test("matchCommand: array with alternatives", () => {
+  assertEquals(
+    matchCommand(["gh", ["pr", "issue"], "view"], ["gh", "pr", "view"]),
+    true,
+  );
+  assertEquals(
+    matchCommand(["gh", ["pr", "issue"], "view"], ["gh", "issue", "view"]),
+    true,
+  );
+  assertEquals(
+    matchCommand(["gh", ["pr", "issue"], "view"], ["gh", "run", "view"]),
+    false,
+  );
+});
+
+Deno.test("matchCommand: array alternatives with trailing *", () => {
+  assertEquals(
+    matchCommand(["gh", ["pr", "issue"], "*"], ["gh", "pr", "view", "123"]),
+    true,
+  );
+  assertEquals(
+    matchCommand(["gh", ["pr", "issue"], "*"], ["gh", "issue"]),
+    true,
+  );
+});
+
+Deno.test("matchCommand: array exact rejects extra args", () => {
+  assertEquals(
+    matchCommand(["gh", "pr"], ["gh", "pr", "view"]),
+    false,
+  );
+});
+
+// --- cwdMatches ---
+
+Deno.test("cwdMatches: * matches any cwd", () => {
+  assertEquals(cwdMatches("*", "/any/path"), true);
+});
+
+Deno.test("cwdMatches: exact match", () => {
+  assertEquals(cwdMatches("/home/user/project", "/home/user/project"), true);
+});
+
+Deno.test("cwdMatches: prefix match (cwd inside pattern dir)", () => {
+  assertEquals(
+    cwdMatches("/home/user/project", "/home/user/project/sub/dir"),
+    true,
+  );
+});
+
+Deno.test("cwdMatches: no partial directory match", () => {
+  assertEquals(cwdMatches("/home/user", "/home/user2"), false);
+});
+
+Deno.test("cwdMatches: different path", () => {
+  assertEquals(cwdMatches("/home/user/project", "/home/other"), false);
 });
 
 // --- Allowlist integration ---
@@ -50,6 +140,13 @@ const RULES: Rules = {
 Deno.test("allowlist: permits gh pr view with args", () => {
   assertEquals(
     isAllowed(["gh", "pr", "view", "123"], "/any", RULES).allowed,
+    true,
+  );
+});
+
+Deno.test("allowlist: permits gh pr view without extra args (zero-or-more)", () => {
+  assertEquals(
+    isAllowed(["gh", "pr", "view"], "/any", RULES).allowed,
     true,
   );
 });
@@ -90,6 +187,14 @@ Deno.test("cwd: allows git push in matching dir", () => {
   );
 });
 
+Deno.test("cwd: allows git push in subdirectory (prefix match)", () => {
+  assertEquals(
+    isAllowed(["git", "push", "origin"], "/home/user/project/sub", CWD_RULES)
+      .allowed,
+    true,
+  );
+});
+
 Deno.test("cwd: blocks git push in other dir", () => {
   assertEquals(
     isAllowed(["git", "push", "origin"], "/home/other", CWD_RULES).allowed,
@@ -124,6 +229,15 @@ Deno.test("deny: blocks git in denied dir", () => {
   );
 });
 
+Deno.test("deny: blocks git in denied subdir (prefix match)", () => {
+  const result = isAllowed(
+    ["git", "status"],
+    "/sensitive/sub",
+    DENY_RULES,
+  );
+  assertEquals(result.allowed, false);
+});
+
 Deno.test("deny: allows git in other dir", () => {
   assertEquals(isAllowed(["git", "status"], "/safe", DENY_RULES).allowed, true);
 });
@@ -142,10 +256,7 @@ Deno.test("specificity: /home/user/project is 3", () => {
   assertEquals(cwdSpecificity("/home/user/project"), 3);
 });
 
-// --- Specificity: more specific allow overrides less specific deny ---
-
 Deno.test("specificity: specific allow overrides global deny", () => {
-  // README example: git push -f denied globally, but allowed in full-vibes
   const rules: Rules = {
     allow: {
       "*": ["git push *"],
@@ -155,17 +266,14 @@ Deno.test("specificity: specific allow overrides global deny", () => {
       "*": ["git push -f"],
     },
   };
-  // In full-vibes: specific allow (specificity 3) beats global deny (specificity 0)
   assertEquals(
     isAllowed(["git", "push", "-f"], "/home/user/full-vibes", rules).allowed,
     true,
   );
-  // Elsewhere: global deny matches at same specificity as global allow, deny wins
   assertEquals(
     isAllowed(["git", "push", "-f"], "/other", rules).allowed,
     false,
   );
-  // Regular push still works everywhere
   assertEquals(
     isAllowed(["git", "push", "origin"], "/other", rules).allowed,
     true,
@@ -177,12 +285,10 @@ Deno.test("specificity: specific deny overrides global allow", () => {
     allow: { "*": ["git *"] },
     deny: { "/home/user/prod-infra": ["git *"] },
   };
-  // In prod-infra: specific deny (specificity 3) beats global allow (specificity 0)
   assertEquals(
     isAllowed(["git", "status"], "/home/user/prod-infra", rules).allowed,
     false,
   );
-  // Elsewhere: global allow works
   assertEquals(isAllowed(["git", "status"], "/other", rules).allowed, true);
 });
 
@@ -202,58 +308,85 @@ Deno.test("specificity: deeper path is more specific", () => {
     allow: { "/home/user/project/sub": ["git push *"] },
     deny: { "/home/user/project": ["git push *"] },
   };
-  // sub is more specific (4 segments) than project (3 segments), allow wins
   assertEquals(
     isAllowed(["git", "push", "origin"], "/home/user/project/sub", rules)
       .allowed,
     true,
   );
-  // In /home/user/project itself, deny applies
   assertEquals(
     isAllowed(["git", "push", "origin"], "/home/user/project", rules).allowed,
     false,
   );
 });
 
-// --- Security edge cases ---
+// --- Array patterns in rules ---
 
-Deno.test("security: * matches semicolons (fnmatch does NOT block injection)", () => {
-  assertEquals(fnmatch("gh pr view *", "gh pr view 123; rm -rf /"), true);
-});
-
-Deno.test("security: * matches pipes", () => {
-  assertEquals(fnmatch("gh pr view *", "gh pr view 123 | rm -rf /"), true);
-});
-
-Deno.test("security: * matches newlines", () => {
-  assertEquals(fnmatch("gh pr view *", "gh pr view 123\nrm -rf /"), true);
-});
-
-Deno.test("security: null byte in pattern truncates at C boundary", () => {
-  assertEquals(fnmatch("gh\0 pr view *", "gh"), true);
-});
-
-// --- FNM_PATHNAME: * stops matching at / ---
-
-Deno.test("security: FNM_PATHNAME prevents * from matching /", () => {
+Deno.test("allowlist: array pattern with alternatives", () => {
+  const rules: Rules = {
+    allow: {
+      "*": [["gh", ["pr", "issue"], "view", "*"]],
+    },
+  };
   assertEquals(
-    fnmatch("gh pr view *", "gh pr view /etc/passwd", FNM_PATHNAME),
+    isAllowed(["gh", "pr", "view", "123"], "/any", rules).allowed,
+    true,
+  );
+  assertEquals(
+    isAllowed(["gh", "issue", "view", "456"], "/any", rules).allowed,
+    true,
+  );
+  assertEquals(
+    isAllowed(["gh", "run", "view", "789"], "/any", rules).allowed,
     false,
   );
 });
 
-Deno.test("security: FNM_PATHNAME still allows args without /", () => {
-  assertEquals(fnmatch("gh pr view *", "gh pr view 123", FNM_PATHNAME), true);
+Deno.test("allowlist: mixed string and array patterns", () => {
+  const rules: Rules = {
+    allow: {
+      "*": ["git status", ["gh", ["pr", "issue"], "*"]],
+    },
+  };
+  assertEquals(isAllowed(["git", "status"], "/any", rules).allowed, true);
+  assertEquals(
+    isAllowed(["gh", "pr", "view"], "/any", rules).allowed,
+    true,
+  );
+  assertEquals(
+    isAllowed(["gh", "issue"], "/any", rules).allowed,
+    true,
+  );
+});
+
+// --- Hint system ---
+
+Deno.test("hint: suggests * when exact pattern matches prefix", () => {
+  const rules: Rules = {
+    allow: { "*": ["git status"] },
+  };
+  const result = isAllowed(["git", "status", "--short"], "/any", rules);
+  assertEquals(result.allowed, false);
+  if (!result.allowed) {
+    assertEquals(typeof result.hint, "string");
+    assertEquals(result.hint!.includes("git status"), true);
+    assertEquals(result.hint!.includes("*"), true);
+  }
+});
+
+Deno.test("hint: no hint when no prefix matches", () => {
+  const rules: Rules = {
+    allow: { "*": ["git status"] },
+  };
+  const result = isAllowed(["git", "push"], "/any", rules);
+  assertEquals(result.allowed, false);
+  if (!result.allowed) {
+    assertEquals(result.hint, undefined);
+  }
 });
 
 // --- Argv-join ambiguity (issue #3) ---
-// argv.join(" ") erases argument boundaries. An attacker controlling the argv
-// array can embed spaces in individual elements to craft a joined string that
-// matches allowlist patterns while executing a different command.
 
 Deno.test("argv-ambiguity: space in argv element cannot spoof pattern match", () => {
-  // ["gh", "pr view", "123"] joins to "gh pr view 123" which matches "gh pr view *"
-  // but actually executes: gh "pr view" "123" — different from gh pr view 123
   const rules: Rules = { allow: { "*": ["gh pr view *"] } };
   assertEquals(
     isAllowed(["gh", "pr view", "123"], "/any", rules).allowed,
@@ -262,7 +395,6 @@ Deno.test("argv-ambiguity: space in argv element cannot spoof pattern match", ()
 });
 
 Deno.test("argv-ambiguity: space in command name cannot spoof pattern", () => {
-  // ["gh pr", "view", "123"] tries to execute a binary named "gh pr"
   const rules: Rules = { allow: { "*": ["gh pr view *"] } };
   assertEquals(
     isAllowed(["gh pr", "view", "123"], "/any", rules).allowed,
@@ -271,13 +403,11 @@ Deno.test("argv-ambiguity: space in command name cannot spoof pattern", () => {
 });
 
 Deno.test("argv-ambiguity: single-element argv cannot match multi-word pattern", () => {
-  // ["git status"] as one element tries to run binary "git status", not git + status
   const rules: Rules = { allow: { "*": ["git status"] } };
   assertEquals(isAllowed(["git status"], "/any", rules).allowed, false);
 });
 
 Deno.test("argv-ambiguity: quoted arg with space still works with wildcard", () => {
-  // ["echo", "hello world"] is legitimate — shell passes "hello world" as one arg
   const rules: Rules = { allow: { "*": ["echo *"] } };
   assertEquals(
     isAllowed(["echo", "hello world"], "/any", rules).allowed,
@@ -286,7 +416,6 @@ Deno.test("argv-ambiguity: quoted arg with space still works with wildcard", () 
 });
 
 Deno.test("argv-ambiguity: normal argv unaffected", () => {
-  // ["gh", "pr", "view", "123"] should still match "gh pr view *"
   const rules: Rules = { allow: { "*": ["gh pr view *"] } };
   assertEquals(
     isAllowed(["gh", "pr", "view", "123"], "/any", rules).allowed,
@@ -295,7 +424,6 @@ Deno.test("argv-ambiguity: normal argv unaffected", () => {
 });
 
 Deno.test("argv-ambiguity: multiple trailing args still match trailing wildcard", () => {
-  // ["gh", "pr", "view", "123", "--web"] should match "gh pr view *"
   const rules: Rules = { allow: { "*": ["gh pr view *"] } };
   assertEquals(
     isAllowed(["gh", "pr", "view", "123", "--web"], "/any", rules).allowed,
@@ -304,24 +432,10 @@ Deno.test("argv-ambiguity: multiple trailing args still match trailing wildcard"
 });
 
 Deno.test("argv-ambiguity: exact match requires exact element count", () => {
-  // "git status" should match ["git", "status"] but not ["git", "status", "--short"]
   const rules: Rules = { allow: { "*": ["git status"] } };
   assertEquals(isAllowed(["git", "status"], "/any", rules).allowed, true);
   assertEquals(
     isAllowed(["git", "status", "--short"], "/any", rules).allowed,
-    false,
-  );
-});
-
-Deno.test("argv-ambiguity: wildcard in middle position matches single element", () => {
-  // "gh * --json" should match ["gh", "pr", "--json"] but not ["gh", "pr", "view", "--json"]
-  const rules: Rules = { allow: { "*": ["gh * --json"] } };
-  assertEquals(
-    isAllowed(["gh", "pr", "--json"], "/any", rules).allowed,
-    true,
-  );
-  assertEquals(
-    isAllowed(["gh", "pr", "view", "--json"], "/any", rules).allowed,
     false,
   );
 });
