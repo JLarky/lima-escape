@@ -50,6 +50,7 @@ export function cwdSpecificity(pattern: string): number {
  * executing a different command.
  */
 export function matchCommand(pattern: string, argv: string[]): boolean {
+  if (argv.length === 0) return false;
   const tokens = pattern.split(" ");
   const lastIdx = tokens.length - 1;
 
