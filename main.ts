@@ -1,4 +1,4 @@
-#!/usr/bin/env -S deno run --no-prompt --allow-net --allow-env=HOME,LIMA_ESCAPE_HOST,LIMA_ESCAPE_PORT,LIMA_ESCAPE_TOKEN --allow-read --allow-write
+#!/usr/bin/env -S deno run --no-prompt --ignore-env --allow-env=HOME --allow-read --allow-write --allow-net
 import { prettyPrintPattern } from "./match.ts";
 import { DEFAULT_PORT, startClient, type StatusInfo } from "./shared.ts";
 
@@ -45,7 +45,9 @@ Setup:
   1. Create a script at ~/.local/bin/lima-escape in your Lima VM:
 
      #!/bin/bash
-     exec deno run --no-prompt --allow-net --ignore-env \\
+     exec deno run --no-prompt --ignore-env --allow-env=HOME \\
+       --allow-read=$HOME/.lima-escape-token --allow-write=$HOME/.lima-escape-token \\
+       --allow-net=host.lima.internal:27332 \\
        https://raw.githubusercontent.com/JLarky/lima-escape/refs/heads/main/main.ts "$@"
 
      Then: chmod +x ~/.local/bin/lima-escape

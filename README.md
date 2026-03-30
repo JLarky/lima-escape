@@ -12,7 +12,9 @@ Create `~/.local/bin/lima-escape`:
 mkdir -p ~/.local/bin
 cat > ~/.local/bin/lima-escape << 'EOF'
 #!/bin/bash
-exec deno run --no-prompt --allow-net --ignore-env \
+exec deno run --no-prompt --ignore-env --allow-env=HOME \
+  --allow-read=$HOME/.lima-escape-token --allow-write=$HOME/.lima-escape-token \
+  --allow-net=host.lima.internal:27332 \
   https://raw.githubusercontent.com/JLarky/lima-escape/refs/heads/main/main.ts "$@"
 EOF
 chmod +x ~/.local/bin/lima-escape
@@ -133,8 +135,9 @@ lima-escape --help     # full setup reference
   Deno), `--ignore-env` (don't inherit host environment), `--allow-env=HOME` (to
   find the config file), `--allow-read` (to read the config file), `--allow-net`
   (to listen for client connections)
-- **Client**: `--allow-net` (to connect to the server), `--ignore-env` (change
-  to --allow-env=LIMA_ESCAPE_HOST,LIMA_ESCAPE_PORT if you need to adjust that)
+- **Client**: `--ignore-env` (don't inherit VM environment), `--allow-env=HOME`
+  (to find the token file), `--allow-read` and `--allow-write` (for the token
+  file at `~/.lima-escape-token`), `--allow-net` (to connect to the server)
 
 ## Security
 
