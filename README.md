@@ -2,6 +2,22 @@
 
 Run arbitrary (allowlisted) commands on your host machine from inside a Lima VM.
 
+## Goals
+
+This tool has a very low chance of completely preventing a motivated attacker
+from escaping the sandbox. For that you'd basically need to limit it to safe
+binaries like `say` or a hard-coded list of scripts that VM can't edit and don't
+take any arguments.
+
+As soon as you start adding general purpose tools like `git` you open yourself
+to attacks like
+`lima-escape git config --global core.pager ~/vm/arbitrary-script.sh`, if you
+allow `gh` now you might get `gh repo archive arbitrary/repo`. So lima-escape
+can help you with your LLM accidentally removing your home folder or
+accidentally sending your ~/.aws credentials to moltbook, but it probably can't
+help much with an advanced attack and you are basically back to all the dangers
+of `--dangerously-skip-permissions`.
+
 ## Setup
 
 ### 1. Install the client (in the VM)
