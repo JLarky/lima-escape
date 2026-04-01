@@ -4,6 +4,8 @@
     "jsr:@jlarky/gha-ts@~0.2.1": "0.2.1",
     "jsr:@std/assert@1": "1.0.19",
     "jsr:@std/internal@^1.0.12": "1.0.12",
+    "jsr:@std/json@^1.0.2": "1.0.3",
+    "jsr:@std/jsonc@^1.0.1": "1.0.2",
     "jsr:@std/yaml@*": "1.0.12",
     "jsr:@std/yaml@^1.0.12": "1.0.12"
   },
@@ -20,6 +22,15 @@
     "@std/internal@1.0.12": {
       "integrity": "972a634fd5bc34b242024402972cd5143eac68d8dffaca5eaa4dba30ce17b027"
     },
+    "@std/json@1.0.3": {
+      "integrity": "97d5710996293a027b7aa5f0d1f4fa29f246f269e6b5597e08807613f37d426c"
+    },
+    "@std/jsonc@1.0.2": {
+      "integrity": "909605dae3af22bd75b1cbda8d64a32cf1fd2cf6efa3f9e224aba6d22c0f44c7",
+      "dependencies": [
+        "jsr:@std/json"
+      ]
+    },
     "@std/yaml@1.0.12": {
       "integrity": "7deabca4545bcedd07c5f69ea53acea71b8b4c67562f224e17b90d75944cb20c"
     }
@@ -28,6 +39,7 @@
     "dependencies": [
       "jsr:@jlarky/gha-ts@~0.2.1",
       "jsr:@std/assert@1",
+      "jsr:@std/jsonc@^1.0.1",
       "jsr:@std/yaml@^1.0.12"
     ]
   }

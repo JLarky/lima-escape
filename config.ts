@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { parse } from "@std/jsonc";
 import type { Pattern } from "./match.ts";
 
 export interface Config {
@@ -10,7 +11,14 @@ export interface Config {
 function configPath(): string {
   const home = Deno.env.get("HOME");
   if (!home) throw new Error("HOME environment variable not set");
-  return join(home, ".config", "lima-escape", "config.json");
+  const base = join(home, ".config", "lima-escape");
+  try {
+    const p = join(base, "config.jsonc");
+    Deno.statSync(p);
+    return p;
+  } catch {
+    return join(base, "config.json");
+  }
 }
 
 /** Validate a single pattern: string or array of (string | string[]). */
@@ -59,7 +67,7 @@ export function loadConfig(path?: string): Config {
     throw e;
   }
 
-  const raw = JSON.parse(text);
+  const raw = parse(text) as any;
 
   validateRuleSet(raw.allow, "allow");
   if (raw.deny !== undefined) {
@@ -85,7 +93,7 @@ export function loadConfig(path?: string): Config {
 export function loadTokens(path?: string): string[] {
   const p = path ?? configPath();
   try {
-    const raw = JSON.parse(Deno.readTextFileSync(p));
+    const raw = parse(Deno.readTextFileSync(p)) as any;
     if (Array.isArray(raw.tokens)) return raw.tokens;
     return [];
   } catch {
