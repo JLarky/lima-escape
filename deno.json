@@ -1,4 +1,10 @@
 {
+  "name": "@jlarky/lima-escape",
+  "version": "0.0.1",
+  "exports": {
+    ".": "./main.ts",
+    "./server": "./server.ts"
+  },
   "tasks": {
     "server": "./server.ts",
     "client": "./main.ts"
