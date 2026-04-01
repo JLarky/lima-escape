@@ -35,6 +35,27 @@ const wf = workflow({
         },
       ],
     },
+    publish: {
+      "runs-on": "ubuntu-latest",
+      needs: ["test"],
+      if: "github.event_name == 'push' && github.ref == 'refs/heads/main'",
+      permissions: {
+        "id-token": "write",
+        contents: "read",
+      },
+      steps: [
+        checkout(),
+        {
+          name: "Setup Deno",
+          uses: "denoland/setup-deno@v2",
+          with: { "deno-version": "v2.x" },
+        },
+        {
+          name: "Publish to JSR",
+          run: "deno publish",
+        },
+      ],
+    },
   },
 });
 

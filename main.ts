@@ -21,7 +21,7 @@ function loadClientToken(): string | null {
 
 if (import.meta.main) {
   const cmd =
-    `deno run --no-prompt --ignore-env --allow-env=HOME --allow-read=$HOME/.config/lima-escape,$HOME/vm --allow-net=0.0.0.0:27332 --allow-run=gh,git,say https://raw.githubusercontent.com/JLarky/lima-escape/refs/heads/main/server.ts`;
+    `deno run --no-prompt --ignore-env --allow-env=HOME --allow-read=$HOME/.config/lima-escape,$HOME/vm --allow-net=0.0.0.0:27332 --allow-run=gh,git,say jsr:@jlarky/lima-escape@0.0.1/server`;
 
   if (
     Deno.args.length === 0 || Deno.args[0] === "--help" ||
@@ -48,7 +48,7 @@ Setup:
      exec deno run --no-prompt --ignore-env --allow-env=HOME \\
        --allow-read=$HOME/.lima-escape-token --allow-write=$HOME/.lima-escape-token \\
        --allow-net=host.lima.internal:27332 \\
-       https://raw.githubusercontent.com/JLarky/lima-escape/refs/heads/main/main.ts "$@"
+       jsr:@jlarky/lima-escape@0.0.1 "$@"
 
      Then: chmod +x ~/.local/bin/lima-escape
 
@@ -151,8 +151,7 @@ Learn more at:
         console.log(`  ${command.padEnd(12)} ${state}`);
       }
       const allowRunKeys = Object.keys(status.allowRun);
-      const serverUrl =
-        `https://raw.githubusercontent.com/JLarky/lima-escape/refs/heads/main/server.ts`;
+      const serverUrl = `jsr:@jlarky/lima-escape@0.0.1/server`;
       const serverCmd = (cmds: string[]) =>
         `deno run --no-prompt --ignore-env --allow-env=HOME --allow-read=$HOME/.config/lima-escape,$HOME/vm --allow-net=0.0.0.0:${port} --allow-run=${
           cmds.join(",")
