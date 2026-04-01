@@ -1,6 +1,8 @@
 {
+  // List of authentication tokens allowed to connect to the server
   "tokens": [],
   "allow": {
+    // "*" matches any directory
     "*": [
       "gh pr view *",
       "gh pr list *",
@@ -19,6 +21,7 @@
     "*": [
       "git push -f"
     ],
+    // Specific paths take precedence
     "/home/user/prod-infra": [
       "git *"
     ]
