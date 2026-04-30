@@ -25,4 +25,10 @@ jobs:
       - name: Format check
         run: deno fmt --check
       - name: Test
-        run: deno test --allow-net --allow-run --allow-read --allow-env
+        run: >
+          export TMPDIR="$RUNNER_TEMP/lima-escape-tests"
+
+          mkdir -p "$TMPDIR"
+
+          deno test --allow-net --allow-run --allow-read --allow-env
+          --allow-write="$TMPDIR"

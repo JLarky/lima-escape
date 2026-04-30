@@ -31,7 +31,11 @@ const wf = workflow({
         { name: "Format check", run: "deno fmt --check" },
         {
           name: "Test",
-          run: "deno test --allow-net --allow-run --allow-read --allow-env",
+          run: lines`
+            export TMPDIR="$RUNNER_TEMP/lima-escape-tests"
+            mkdir -p "$TMPDIR"
+            deno test --allow-net --allow-run --allow-read --allow-env --allow-write="$TMPDIR"
+          `,
         },
       ],
     },
