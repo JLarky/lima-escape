@@ -1,6 +1,8 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import {
+  getCwdStatus,
   MAX_OUTPUT_SIZE,
+  resolveRequestCwd,
   startClient,
   truncateOutput,
   validateCwd,
@@ -354,4 +356,82 @@ Deno.test("validateCwd: resolves path traversal", async () => {
     // should be normalized — no ".." in resolved path
     assertEquals(result.resolved.includes(".."), false);
   }
+});
+
+Deno.test("resolveRequestCwd: uses existing host cwd as-is", async () => {
+  const result = await resolveRequestCwd("/tmp", {
+    "/tmp": "/does/not/matter",
+  });
+  assertEquals("error" in result, false);
+  if ("logical" in result) {
+    assertEquals(result.logical.startsWith("/"), true);
+    assertEquals(result.execution.startsWith("/"), true);
+  }
+});
+
+Deno.test("resolveRequestCwd: maps nonexistent Lima cwd to host cwd", async () => {
+  const result = await resolveRequestCwd(
+    "/home/jlarky.guest/work/project",
+    {
+      "/home/jlarky.guest/work/project": "/tmp",
+    },
+  );
+  assertEquals("error" in result, false);
+  if ("logical" in result) {
+    assertEquals(result.logical, "/home/jlarky.guest/work/project");
+    assertEquals(result.execution, "/tmp");
+  }
+});
+
+Deno.test("resolveRequestCwd: prefers the most specific path mapping", async () => {
+  const result = await resolveRequestCwd(
+    "/vm/project",
+    {
+      "/vm": "/tmp",
+      "/vm/project": "/var/tmp",
+    },
+  );
+  assertEquals("error" in result, false);
+  if ("logical" in result) {
+    assertEquals(result.execution, "/var/tmp");
+  }
+});
+
+Deno.test("resolveRequestCwd: reports translated host path failures", async () => {
+  const result = await resolveRequestCwd(
+    "/home/jlarky.guest/work/project",
+    {
+      "/home/jlarky.guest/work": "/definitely/not/here",
+    },
+  );
+  assertEquals("error" in result, true);
+  if ("error" in result) {
+    assertStringIncludes(
+      result.error,
+      'mapped to "/definitely/not/here/project"',
+    );
+  }
+});
+
+Deno.test("getCwdStatus: reports mapped current cwd", async () => {
+  const status = await getCwdStatus("/home/jlarky.guest/work/project", {
+    "/home/jlarky.guest/work/project": "/tmp",
+  });
+
+  assertEquals(status.requested, "/home/jlarky.guest/work/project");
+  assertEquals(status.matchCwd, "/home/jlarky.guest/work/project");
+  assertEquals(status.executionCwd, "/tmp");
+  assertEquals(status.mapped, true);
+  assertEquals(status.error, undefined);
+});
+
+Deno.test("getCwdStatus: reports rejected current cwd", async () => {
+  const status = await getCwdStatus("/home/jlarky.guest/work/project", {
+    "/home/jlarky.guest/work": "/definitely/not/here",
+  });
+
+  assertEquals(status.requested, "/home/jlarky.guest/work/project");
+  assertEquals(typeof status.error, "string");
+  assertEquals(status.matchCwd, undefined);
+  assertEquals(status.executionCwd, undefined);
 });

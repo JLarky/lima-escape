@@ -71,6 +71,9 @@ rules scoped by directory:
 ```json
 {
   "tokens": ["<paste token from lima-escape --auth>"],
+  "pathMap": {
+    "/home/jlarky.guest/work": "/Users/jlarky/work"
+  },
   "allow": {
     "*": [
       "say *",
@@ -90,6 +93,11 @@ rules scoped by directory:
   }
 }
 ```
+
+`pathMap` is optional. It rewrites a Lima cwd prefix to a host cwd prefix before
+execution. This lets you run commands from a Lima path that does not exist on
+the host, as long as the mapped host path does exist. Allow/deny rules still
+match the original Lima path.
 
 #### Command patterns
 
@@ -129,6 +137,17 @@ Keys in allow/deny objects are directory patterns:
 More specific paths override less specific ones. Deny rules break ties at equal
 specificity.
 
+#### Path mappings
+
+- Keys in `pathMap` are absolute Lima path prefixes
+- Values in `pathMap` are absolute host path prefixes
+- Longest matching prefix wins
+- If the original cwd already exists on the host, it is used as-is
+- If the original cwd does not exist and no mapping matches, the request is
+  rejected
+- If a mapping matches but the translated host path does not exist, the request
+  is rejected
+
 ### 4. Start the server (on host)
 
 ```bash
@@ -164,8 +183,8 @@ lima-escape --help     # full setup reference
 4. **Argv-in, argv-out**: client sends pre-split argv from the OS, server
    executes as argv — no string splitting
 5. **cwd validation**: the server resolves the client-provided working directory
-   with `realPath`, rejecting non-absolute, non-existent, or non-directory
-   paths. This prevents path traversal and fabricated paths.
+   with `realPath`, or translates it through `pathMap` first. It still rejects
+   non-absolute, non-existent, or non-directory execution paths.
 6. **TCP exposure**: server binds to `0.0.0.0` by default — any host on the
    network can connect. Scope with `--allow-net=0.0.0.0:27332` for the listening
    port only

@@ -28,6 +28,7 @@ function checkToken(token: string): boolean {
 await startServer({
   allow: config.allow,
   deny: config.deny,
+  pathMap: config.pathMap,
   isAllowed,
   checkToken,
 });

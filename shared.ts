@@ -16,8 +16,18 @@ export interface Request {
 export interface StatusInfo {
   allow: Record<string, Pattern[]>;
   deny?: Record<string, Pattern[]>;
+  pathMap?: Record<string, string>;
+  cwdStatus?: CwdStatus;
   allowRun: Record<string, string>;
   pid?: number;
+}
+
+export interface CwdStatus {
+  requested: string;
+  matchCwd?: string;
+  executionCwd?: string;
+  mapped?: boolean;
+  error?: string;
 }
 
 export interface Response {
@@ -32,9 +42,34 @@ import type { AllowResult, Pattern, Rules } from "./match.ts";
 export interface ServerOptions {
   allow: Record<string, Pattern[]>;
   deny?: Record<string, Pattern[]>;
+  pathMap?: Record<string, string>;
   isAllowed: (argv: string[], cwd: string, rules: Rules) => AllowResult;
   port?: number;
   checkToken?: (token: string) => boolean;
+}
+
+function pathSpecificity(path: string): number {
+  return path.split("/").filter(Boolean).length;
+}
+
+function translatePath(path: string, pathMap?: Record<string, string>): string {
+  if (!pathMap || !path.startsWith("/")) return path;
+
+  let bestMatch: [string, string] | undefined;
+  for (const entry of Object.entries(pathMap)) {
+    const [vmPrefix] = entry;
+    if (path !== vmPrefix && !path.startsWith(vmPrefix + "/")) continue;
+    if (
+      !bestMatch || pathSpecificity(vmPrefix) > pathSpecificity(bestMatch[0])
+    ) {
+      bestMatch = entry;
+    }
+  }
+
+  if (!bestMatch) return path;
+  const [vmPrefix, hostPrefix] = bestMatch;
+  const suffix = path.slice(vmPrefix.length);
+  return hostPrefix + suffix;
 }
 
 export function truncateOutput(
@@ -66,6 +101,61 @@ export async function validateCwd(
   } catch {
     return { error: `cwd does not exist on host: "${cwd}"` };
   }
+}
+
+export async function resolveRequestCwd(
+  requestedCwd: string,
+  pathMap?: Record<string, string>,
+): Promise<
+  | { logical: string; execution: string }
+  | { error: string }
+> {
+  const logicalResult = await validateCwd(requestedCwd).catch(() => ({
+    error: `cwd does not exist on host: "${requestedCwd}"`,
+  }));
+  if ("resolved" in logicalResult) {
+    return {
+      logical: logicalResult.resolved,
+      execution: logicalResult.resolved,
+    };
+  }
+
+  const translatedCwd = translatePath(requestedCwd, pathMap);
+  if (translatedCwd === requestedCwd) {
+    return { error: logicalResult.error };
+  }
+
+  const translatedResult = await validateCwd(translatedCwd);
+  if ("error" in translatedResult) {
+    return {
+      error:
+        `${logicalResult.error}; mapped to "${translatedCwd}" but ${translatedResult.error}`,
+    };
+  }
+
+  return {
+    logical: requestedCwd,
+    execution: translatedResult.resolved,
+  };
+}
+
+export async function getCwdStatus(
+  requestedCwd: string,
+  pathMap?: Record<string, string>,
+): Promise<CwdStatus> {
+  const cwdResult = await resolveRequestCwd(requestedCwd, pathMap);
+  if ("error" in cwdResult) {
+    return {
+      requested: requestedCwd,
+      error: cwdResult.error,
+    };
+  }
+  return {
+    requested: requestedCwd,
+    matchCwd: cwdResult.logical,
+    executionCwd: cwdResult.execution,
+    mapped: cwdResult.logical !== cwdResult.execution,
+  };
 }
 
 async function executeCommand(argv: string[], cwd: string): Promise<Response> {
@@ -134,6 +224,8 @@ async function handleConnection(conn: Deno.Conn, opts: ServerOptions) {
       const status: StatusInfo = {
         allow: opts.allow,
         ...(opts.deny ? { deny: opts.deny } : {}),
+        ...(opts.pathMap ? { pathMap: opts.pathMap } : {}),
+        cwdStatus: await getCwdStatus(req.cwd, opts.pathMap),
         allowRun,
         ...(authenticated ? { pid: Deno.pid } : {}),
       };
@@ -150,7 +242,7 @@ async function handleConnection(conn: Deno.Conn, opts: ServerOptions) {
         };
         console.log("rejected: invalid or missing auth token");
       } else {
-        const cwdResult = await validateCwd(req.cwd);
+        const cwdResult = await resolveRequestCwd(req.cwd, opts.pathMap);
         if ("error" in cwdResult) {
           res = {
             code: 1,
@@ -160,9 +252,10 @@ async function handleConnection(conn: Deno.Conn, opts: ServerOptions) {
           };
           console.log("rejected: invalid cwd -", cwdResult.error);
         } else {
-          const cwd = cwdResult.resolved;
+          const matchCwd = cwdResult.logical;
+          const executionCwd = cwdResult.execution;
           const rules: Rules = { allow: opts.allow, deny: opts.deny };
-          const result = opts.isAllowed(req.argv, cwd, rules);
+          const result = opts.isAllowed(req.argv, matchCwd, rules);
           if (!result.allowed) {
             const cmd = req.argv.join(" ");
             const hint = result.hint ? `\nhint: ${result.hint}` : "";
@@ -176,9 +269,16 @@ async function handleConnection(conn: Deno.Conn, opts: ServerOptions) {
             console.log("denied:", cmd, "-", result.reason);
           } else {
             const cmd = req.argv.join(" ");
-            console.log("executing:", cmd, "in", cwd);
+            console.log(
+              "executing:",
+              cmd,
+              "for requested cwd",
+              matchCwd,
+              "in",
+              executionCwd,
+            );
             try {
-              res = await executeCommand(req.argv, cwd);
+              res = await executeCommand(req.argv, executionCwd);
             } catch (e) {
               res = {
                 code: 1,

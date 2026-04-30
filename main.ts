@@ -77,13 +77,19 @@ Setup:
 
      {
        "tokens": ["<paste token from step 6>"],
+       "pathMap": {
+         "/home/jlarky.guest/work": "/Users/jlarky/work"
+       },
        "allow": { "*": ["gh pr view *", "git status"] },
        "deny": { "/sensitive": ["git *"] }
      }
 
-     Keys are directory patterns. "*" matches any directory; paths use prefix
-     matching (e.g. "/home/user" matches "/home/user/sub"). Command patterns
-     use exact token matching — "gh pr *" means gh + pr + zero or more args.
+     pathMap is optional. It rewrites a Lima cwd prefix to a host cwd prefix
+     before execution. Allow/deny rules still match the Lima path you ran from.
+
+      Keys are directory patterns. "*" matches any directory; paths use prefix
+      matching (e.g. "/home/user" matches "/home/user/sub"). Command patterns
+      use exact token matching - "gh pr *" means gh + pr + zero or more args.
      Deny rules take precedence over allow rules at equal specificity.
 
   6. Authenticate from the VM:
@@ -146,6 +152,24 @@ Learn more at:
           }
         }
       }
+      if (status.pathMap) {
+        console.log("\nPath mappings:");
+        for (const [vmPath, hostPath] of Object.entries(status.pathMap)) {
+          console.log(`  ${vmPath} -> ${hostPath}`);
+        }
+      }
+      if (status.cwdStatus) {
+        console.log("\nCurrent cwd:");
+        console.log(`  requested  ${status.cwdStatus.requested}`);
+        if (status.cwdStatus.error) {
+          console.log(`  rejected   ${status.cwdStatus.error}`);
+        } else if (status.cwdStatus.mapped) {
+          console.log(`  matched    ${status.cwdStatus.matchCwd}`);
+          console.log(`  executes   ${status.cwdStatus.executionCwd}`);
+        } else {
+          console.log(`  executes   ${status.cwdStatus.executionCwd}`);
+        }
+      }
       console.log("\nExecutable commands (--allow-run):");
       for (const [command, state] of Object.entries(status.allowRun)) {
         console.log(`  ${command.padEnd(12)} ${state}`);
@@ -158,7 +182,11 @@ Learn more at:
           cmds.join(",")
         } ${serverUrl}`;
       const configJson = JSON.stringify(
-        { allow: status.allow, ...(status.deny ? { deny: status.deny } : {}) },
+        {
+          ...(status.pathMap ? { pathMap: status.pathMap } : {}),
+          allow: status.allow,
+          ...(status.deny ? { deny: status.deny } : {}),
+        },
         null,
         2,
       );
