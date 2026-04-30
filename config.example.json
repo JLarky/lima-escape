@@ -1,5 +1,8 @@
 {
   "tokens": [],
+  "pathMap": {
+    "/home/jlarky.guest/work": "/Users/jlarky/work"
+  },
   "allow": {
     "*": [
       "gh pr view *",

@@ -5,6 +5,7 @@ export interface Config {
   allow: Record<string, Pattern[]>;
   deny?: Record<string, Pattern[]>;
   tokens?: string[];
+  pathMap?: Record<string, string>;
 }
 
 function configPath(): string {
@@ -45,6 +46,28 @@ function validateRuleSet(
   }
 }
 
+function validatePathMap(
+  value: unknown,
+): asserts value is Record<string, string> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(
+      'Invalid config: "pathMap" must be an object mapping VM path prefixes to host path prefixes',
+    );
+  }
+  for (const [vmPath, hostPath] of Object.entries(value)) {
+    if (!vmPath.startsWith("/")) {
+      throw new Error(
+        `Invalid config: "pathMap" key "${vmPath}" must be an absolute path`,
+      );
+    }
+    if (typeof hostPath !== "string" || !hostPath.startsWith("/")) {
+      throw new Error(
+        `Invalid config: "pathMap" key "${vmPath}" must map to an absolute host path string`,
+      );
+    }
+  }
+}
+
 export function loadConfig(path?: string): Config {
   const p = path ?? configPath();
   let text: string;
@@ -65,6 +88,9 @@ export function loadConfig(path?: string): Config {
   if (raw.deny !== undefined) {
     validateRuleSet(raw.deny, "deny");
   }
+  if (raw.pathMap !== undefined) {
+    validatePathMap(raw.pathMap);
+  }
   if (raw.tokens !== undefined) {
     if (
       !Array.isArray(raw.tokens) ||
@@ -77,6 +103,7 @@ export function loadConfig(path?: string): Config {
   return {
     allow: raw.allow,
     ...(raw.deny ? { deny: raw.deny } : {}),
+    ...(raw.pathMap ? { pathMap: raw.pathMap } : {}),
     ...(raw.tokens ? { tokens: raw.tokens } : {}),
   };
 }
