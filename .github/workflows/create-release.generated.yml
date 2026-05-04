@@ -16,16 +16,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install Deno
-        uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.x
       - name: Get version from deno.json
         id: get_version
-        run: >-
-          echo "version=$(deno eval
-          'console.log(JSON.parse(Deno.readTextFileSync("deno.json")).version)')"
-          >> "$GITHUB_OUTPUT"
+        run: echo "version=$(jq -r .version deno.json)" >> "$GITHUB_OUTPUT"
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:

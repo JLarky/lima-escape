@@ -1,7 +1,7 @@
 import { stringify as yamlStringify } from "@std/yaml";
 import { workflow } from "@jlarky/gha-ts/workflow-types";
 import { generateWorkflow } from "@jlarky/gha-ts/cli";
-import { checkoutAndInstallDeno } from "./utils/steps.ts";
+import { checkout } from "./utils/steps.ts";
 
 const wf = workflow({
   name: "Create Release",
@@ -18,12 +18,11 @@ const wf = workflow({
     "create-release": {
       "runs-on": "ubuntu-latest",
       steps: [
-        ...checkoutAndInstallDeno(),
+        checkout(),
         {
           name: "Get version from deno.json",
           id: "get_version",
-          run:
-            `echo "version=$(deno eval 'console.log(JSON.parse(Deno.readTextFileSync(\"deno.json\")).version)')" >> "$GITHUB_OUTPUT"`,
+          run: `echo "version=$(jq -r .version deno.json)" >> "$GITHUB_OUTPUT"`,
         },
         {
           name: "Create Release",
