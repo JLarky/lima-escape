@@ -6,7 +6,8 @@ import { publishJsr } from "./utils/jobs.ts";
 const wf = workflow({
   name: "Publish",
   on: {
-    push: { branches: ["main"] },
+    release: { types: ["published"] },
+    workflow_dispatch: {},
   },
   permissions: {
     contents: "read",
