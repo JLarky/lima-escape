@@ -1,4 +1,19 @@
 {
+  "name": "@jlarky/lima-escape",
+  "version": "0.1.0",
+  "license": "MIT",
+  "exports": {
+    ".": "./server.ts",
+    "./client": "./main.ts"
+  },
+  "publish": {
+    "exclude": [
+      "*_test.ts",
+      ".github",
+      ".vscode",
+      "deno.lock"
+    ]
+  },
   "tasks": {
     "server": "./server.ts",
     "client": "./main.ts"

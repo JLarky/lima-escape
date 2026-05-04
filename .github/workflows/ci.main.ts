@@ -3,6 +3,7 @@ import { workflow } from "@jlarky/gha-ts/workflow-types";
 import { checkout } from "@jlarky/gha-ts/actions";
 import { generateWorkflow } from "@jlarky/gha-ts/cli";
 import { lines } from "@jlarky/gha-ts/utils";
+import { publishJsr } from "./utils/jobs.ts";
 
 const wf = workflow({
   name: "CI",
@@ -11,6 +12,7 @@ const wf = workflow({
     pull_request: {},
   },
   jobs: {
+    dryRunPublish: publishJsr({ dryRun: true }),
     test: {
       "runs-on": "ubuntu-24.04-arm",
       steps: [
@@ -23,7 +25,9 @@ const wf = workflow({
         {
           name: "Check generated workflows are up to date",
           run: lines`
-            deno run --allow-read --allow-write .github/workflows/ci.main.ts
+            for f in .github/workflows/*.main.ts; do
+              deno run --allow-read --allow-write "$f"
+            done
             git diff --exit-code .github/workflows/
           `,
         },
