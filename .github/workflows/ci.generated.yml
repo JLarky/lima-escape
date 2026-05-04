@@ -8,6 +8,18 @@ name: CI
       - main
   pull_request: {}
 jobs:
+  dryRunPublish:
+    name: Dry run publish package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Dry run publish package
+        run: deno publish --dry-run
   test:
     runs-on: ubuntu-24.04-arm
     steps:
@@ -18,7 +30,9 @@ jobs:
           deno-version: v2.x
       - name: Check generated workflows are up to date
         run: |
-          deno run --allow-read --allow-write .github/workflows/ci.main.ts
+          for f in .github/workflows/*.main.ts; do
+            deno run --allow-read --allow-write "$f"
+          done
           git diff --exit-code .github/workflows/
       - name: Lint
         run: deno lint
