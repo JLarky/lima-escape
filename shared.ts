@@ -99,7 +99,8 @@ export async function validateCwd(
     }
     return { resolved };
   } catch (e) {
-    if (e instanceof Deno.errors.PermissionDenied) {
+    const name = (e as Error)?.name;
+    if (name === "NotCapable" || name === "PermissionDenied") {
       return {
         error:
           `cwd not readable on host (server needs --allow-read=${cwd}): "${cwd}"`,
