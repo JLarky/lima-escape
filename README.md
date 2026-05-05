@@ -31,7 +31,7 @@ cat > ~/.local/bin/lima-escape << 'EOF'
 exec deno run --no-prompt --ignore-env --allow-env=HOME \
   --allow-read=$HOME/.lima-escape-token --allow-write=$HOME/.lima-escape-token \
   --allow-net=host.lima.internal:27332 \
-  https://raw.githubusercontent.com/JLarky/lima-escape/refs/heads/main/main.ts "$@"
+  jsr:@jlarky/lima-escape/client "$@"
 EOF
 chmod +x ~/.local/bin/lima-escape
 ```
@@ -151,7 +151,7 @@ specificity.
 ### 4. Start the server (on host)
 
 ```bash
-deno run --no-prompt --ignore-env --allow-env=HOME --allow-read=$HOME/.config/lima-escape,$HOME/vm --allow-net=0.0.0.0:27332 --allow-run=gh,git,say https://raw.githubusercontent.com/JLarky/lima-escape/refs/heads/main/server.ts
+deno run --no-prompt --ignore-env --allow-env=HOME --allow-read=$HOME/.config/lima-escape,$HOME/vm --allow-net=0.0.0.0:27332 --allow-run=gh,git,say jsr:@jlarky/lima-escape
 ```
 
 Adjust `--allow-run` to only allow specific commands. Use `--allow-run=*` to
