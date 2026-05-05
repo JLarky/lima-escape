@@ -358,6 +358,19 @@ Deno.test("validateCwd: resolves path traversal", async () => {
   }
 });
 
+Deno.test({
+  name: "validateCwd: distinguishes PermissionDenied from missing path",
+  permissions: { read: ["/tmp"] },
+  async fn() {
+    const result = await validateCwd("/usr");
+    assertEquals("error" in result, true);
+    if ("error" in result) {
+      assertStringIncludes(result.error, "not readable");
+      assertStringIncludes(result.error, "--allow-read=/usr");
+    }
+  },
+});
+
 Deno.test("resolveRequestCwd: uses existing host cwd as-is", async () => {
   const result = await resolveRequestCwd("/tmp", {
     "/tmp": "/does/not/matter",
