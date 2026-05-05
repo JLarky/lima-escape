@@ -98,7 +98,13 @@ export async function validateCwd(
       return { error: `cwd is not a directory: "${cwd}"` };
     }
     return { resolved };
-  } catch {
+  } catch (e) {
+    if (e instanceof Deno.errors.PermissionDenied) {
+      return {
+        error:
+          `cwd not readable on host (server needs --allow-read=${cwd}): "${cwd}"`,
+      };
+    }
     return { error: `cwd does not exist on host: "${cwd}"` };
   }
 }
