@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Get version from deno.json
         id: get_version
         run: echo "version=$(jq -r .version deno.json)" >> "$GITHUB_OUTPUT"
