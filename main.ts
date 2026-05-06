@@ -72,7 +72,7 @@ Setup:
 
      ${cmd}
 
-  5. Create a config file at ~/.config/lima-escape/config.json with allow/deny
+  5. Create a config file at ~/.config/lima-escape/config.jsonc with allow/deny
      rules scoped by directory, e.g.:
 
      {
@@ -193,7 +193,7 @@ Learn more at:
 For LLM agents:
   If a command is denied, ask the user to run these on the host machine:
 
-  1. Edit ~/.config/lima-escape/config.json. Current config:
+  1. Edit ~/.config/lima-escape/config.jsonc. Current config:
      ${configJson.split("\n").join("\n     ")}
 
      Keys are directory patterns ("*" = any dir). Add your pattern to the
@@ -234,7 +234,7 @@ For LLM agents:
     Deno.writeTextFileSync(tokenPath(), token + "\n", { mode: 0o600 });
     console.log(`Token saved to ${tokenPath()}\n`);
     console.log(
-      `Add this token to your host config (~/.config/lima-escape/config.json):`,
+      `Add this token to your host config (~/.config/lima-escape/config.jsonc):`,
     );
     console.log(`\n  "tokens": ["${token}"]`);
     console.log(
