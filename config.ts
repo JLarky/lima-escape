@@ -83,7 +83,7 @@ export function loadConfig(path?: string): Config {
     throw e;
   }
 
-  const raw = parseJsonc(text);
+  const raw = parseJsonc(text) as Record<string, unknown>;
 
   validateRuleSet(raw.allow, "allow");
   if (raw.deny !== undefined) {
@@ -113,8 +113,8 @@ export function loadConfig(path?: string): Config {
 export function loadTokens(path?: string): string[] {
   const p = path ?? configPath();
   try {
-    const raw = parseJsonc(Deno.readTextFileSync(p));
-    if (Array.isArray(raw.tokens)) return raw.tokens;
+    const raw = parseJsonc(Deno.readTextFileSync(p)) as Record<string, unknown>;
+    if (Array.isArray(raw.tokens)) return raw.tokens as string[];
     return [];
   } catch {
     return [];
