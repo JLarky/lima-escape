@@ -210,7 +210,8 @@ async function handleConnection(conn: Deno.Conn, opts: ServerOptions) {
             if (typeof p === "string") return [p.split(" ")[0]];
             const first = p[0];
             if (typeof first === "string") return [first];
-            return first; // string[] alternatives — all are possible commands
+            if (Array.isArray(first)) return first; // alternatives — all are possible commands
+            return [];
           }),
         ),
       ];

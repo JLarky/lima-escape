@@ -6,8 +6,14 @@
  * - Array patterns: ["gh", ["pr", "issue"], "*"] (Codex-style alternatives)
  */
 
+export interface RegexpToken {
+  regexp: string;
+}
+
+export type PatternToken = string | string[] | RegexpToken;
+
 /** A single command pattern: string sugar or array form. */
-export type Pattern = string | (string | string[])[];
+export type Pattern = string | PatternToken[];
 
 export type AllowResult =
   | { allowed: true }
@@ -35,7 +41,7 @@ export function cwdMatches(pattern: string, cwd: string): boolean {
 }
 
 /** Desugar a string pattern into array form by splitting on spaces. */
-function toArrayPattern(pattern: Pattern): (string | string[])[] {
+function toArrayPattern(pattern: Pattern): PatternToken[] {
   if (typeof pattern === "string") {
     return pattern.split(" ");
   }
@@ -76,11 +82,18 @@ export function matchCommand(pattern: Pattern, argv: string[]): boolean {
 }
 
 /** Match a single token against an argv element. */
-function matchToken(token: string | string[], value: string): boolean {
+function matchToken(token: PatternToken, value: string): boolean {
   if (Array.isArray(token)) {
     return token.includes(value);
   }
+  if (typeof token === "object") {
+    return new RegExp(token.regexp).test(value);
+  }
   return token === value;
+}
+
+function isRegexpToken(token: PatternToken): token is RegexpToken {
+  return typeof token === "object" && !Array.isArray(token);
 }
 
 /**
@@ -91,15 +104,20 @@ function matchToken(token: string | string[], value: string): boolean {
  */
 export function prettyPrintPattern(pattern: Pattern): string {
   if (typeof pattern === "string") return pattern;
-  const hasAlternatives = pattern.some((el) => Array.isArray(el));
-  if (!hasAlternatives) return (pattern as string[]).join(" ");
+  const hasStructuredTokens = pattern.some((el) =>
+    Array.isArray(el) || isRegexpToken(el)
+  );
+  if (!hasStructuredTokens) return (pattern as string[]).join(" ");
   return JSON.stringify(pattern);
 }
 
 /** Format a pattern for display in error messages (with quotes). */
 function formatPattern(pattern: Pattern): string {
   const pp = prettyPrintPattern(pattern);
-  if (typeof pattern === "string" || !pattern.some((el) => Array.isArray(el))) {
+  if (
+    typeof pattern === "string" ||
+    !pattern.some((el) => Array.isArray(el) || isRegexpToken(el))
+  ) {
     return `"${pp}"`;
   }
   return pp;
@@ -204,9 +222,11 @@ function findHint(argv: string[], rules: Rules): string | undefined {
       if (prefixMatches) {
         const patStr = typeof pattern === "string"
           ? pattern
-          : tokens.map((t) => Array.isArray(t) ? `[${t.join(",")}]` : t).join(
-            " ",
-          );
+          : tokens.map((t) => {
+            if (Array.isArray(t)) return `[${t.join(",")}]`;
+            if (isRegexpToken(t)) return JSON.stringify(t);
+            return t;
+          }).join(" ");
         return `"${patStr}" is allowed but does not permit extra arguments. To allow "${patStr}" with any arguments, use "${patStr} *" instead.`;
       }
     }

@@ -50,6 +50,30 @@ Deno.test("loadConfig: accepts array-form patterns", () => {
   );
 });
 
+Deno.test("loadConfig: accepts regexp token patterns", () => {
+  withTempConfig(
+    {
+      allow: {
+        "*": [["gh", "api", {
+          regexp:
+            "^repos/[A-Za-z0-9-]+/[A-Za-z0-9._-]+/pulls/[0-9]+/(comments|reviews|review_comments)$",
+        }]],
+      },
+    },
+    (path) => {
+      const config = loadConfig(path);
+      assertEquals(config.allow["*"], [[
+        "gh",
+        "api",
+        {
+          regexp:
+            "^repos/[A-Za-z0-9-]+/[A-Za-z0-9._-]+/pulls/[0-9]+/(comments|reviews|review_comments)$",
+        },
+      ]]);
+    },
+  );
+});
+
 // --- missing / wrong-type top-level fields ---
 
 Deno.test("loadConfig: error names the field when allow is missing", () => {
@@ -74,6 +98,15 @@ Deno.test("loadConfig: error names the field when deny is not an object", () => 
   withTempConfig({ allow: { "*": ["git status"] }, deny: 42 }, (path) => {
     assertThrows(() => loadConfig(path), Error, 'at "deny"');
   });
+});
+
+Deno.test("loadConfig: error names regexp token field when regexp is invalid", () => {
+  withTempConfig(
+    { allow: { "*": [["gh", "api", { regexp: "^(" }]] } },
+    (path) => {
+      assertThrows(() => loadConfig(path), Error, 'at "allow.*.0.2"');
+    },
+  );
 });
 
 Deno.test("loadConfig: error names the field when tokens is not an array", () => {

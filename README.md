@@ -114,7 +114,7 @@ Two formats are supported:
   etc.)
 - Tokens are matched with `===`, no glob/regex
 
-**Array patterns** (for alternatives):
+**Array patterns** (for alternatives and structured tokens):
 
 ```json
 { "allow": { "*": [["gh", ["pr", "issue"], "*"], ["git", "status"]] } }
@@ -124,6 +124,25 @@ Two formats are supported:
 - `["gh", "pr", "*"]` — zero or more trailing args (same as `"gh pr *"`)
 - `["gh", ["pr", "issue"], "*"]` — alternatives: matches `gh pr ...` or
   `gh issue ...`
+- `{"regexp":"^repos/.+/comments$"}` — regex for a single argv token
+
+Example regex-scoped `gh api` route:
+
+```json
+{
+  "allow": {
+    "*": [
+      [
+        "gh",
+        "api",
+        {
+          "regexp": "^repos/[A-Za-z0-9-]+/[A-Za-z0-9._-]+/pulls/[0-9]+/(comments|reviews|review_comments)$"
+        }
+      ]
+    ]
+  }
+}
+```
 
 Fail-closed: forgetting `*` gives less access, not more.
 

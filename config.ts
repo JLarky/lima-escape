@@ -2,9 +2,29 @@ import { join } from "node:path";
 import { parse as parseJsonc } from "@std/jsonc";
 import * as v from "valibot";
 
+const RegexpTokenSchema = v.pipe(
+  v.object({
+    regexp: v.string(),
+  }),
+  v.check(({ regexp }) => {
+    try {
+      new RegExp(regexp);
+      return true;
+    } catch {
+      return false;
+    }
+  }, "must contain a valid regular expression"),
+);
+
+const PatternTokenSchema = v.union([
+  v.string(),
+  v.array(v.string()),
+  RegexpTokenSchema,
+]);
+
 const PatternSchema = v.union([
   v.string(),
-  v.array(v.union([v.string(), v.array(v.string())])),
+  v.array(PatternTokenSchema),
 ]);
 
 const RuleSetSchema = v.record(v.string(), v.array(PatternSchema));

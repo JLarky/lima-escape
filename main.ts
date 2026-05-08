@@ -87,10 +87,12 @@ Setup:
      pathMap is optional. It rewrites a Lima cwd prefix to a host cwd prefix
      before execution. Allow/deny rules still match the Lima path you ran from.
 
-      Keys are directory patterns. "*" matches any directory; paths use prefix
-      matching (e.g. "/home/user" matches "/home/user/sub"). Command patterns
-      use exact token matching - "gh pr *" means gh + pr + zero or more args.
-     Deny rules take precedence over allow rules at equal specificity.
+       Keys are directory patterns. "*" matches any directory; paths use prefix
+       matching (e.g. "/home/user" matches "/home/user/sub"). Command patterns
+       use exact token matching - "gh pr *" means gh + pr + zero or more args.
+       Array patterns may also use structured tokens like
+       {"regexp":"^repos/.+/comments$"} to match a single argv element.
+       Deny rules take precedence over allow rules at equal specificity.
 
   6. Authenticate from the VM:
 
