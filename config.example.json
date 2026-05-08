@@ -7,6 +7,13 @@
     "*": [
       "gh pr view *",
       "gh pr list *",
+      [
+        "gh",
+        "api",
+        {
+          "regexp": "^repos/[A-Za-z0-9-]+/[A-Za-z0-9._-]+/pulls/[0-9]+/(comments|reviews|review_comments)$"
+        }
+      ],
       "gh issue view *",
       "gh issue list *",
       "git status",

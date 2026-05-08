@@ -92,6 +92,50 @@ Deno.test("matchCommand: array alternatives with trailing *", () => {
   );
 });
 
+Deno.test("matchCommand: regexp token matches a single argv element", () => {
+  assertEquals(
+    matchCommand(
+      [
+        "gh",
+        "api",
+        {
+          regexp:
+            "^repos/[A-Za-z0-9-]+/[A-Za-z0-9._-]+/pulls/[0-9]+/(comments|reviews|review_comments)$",
+        },
+      ],
+      ["gh", "api", "repos/JLarky/lima-escape/pulls/948/comments"],
+    ),
+    true,
+  );
+});
+
+Deno.test("matchCommand: regexp token does not cross argv elements", () => {
+  assertEquals(
+    matchCommand(
+      ["gh", "api", { regexp: "^repos/.+/comments$" }],
+      ["gh", "api", "repos/JLarky/lima-escape/pulls/948", "comments"],
+    ),
+    false,
+  );
+});
+
+Deno.test("matchCommand: regexp token rejects non-matching argv element", () => {
+  assertEquals(
+    matchCommand(
+      [
+        "gh",
+        "api",
+        {
+          regexp:
+            "^repos/[A-Za-z0-9-]+/[A-Za-z0-9._-]+/pulls/[0-9]+/(comments|reviews|review_comments)$",
+        },
+      ],
+      ["gh", "api", "repos/JLarky/lima-escape/issues/948/comments"],
+    ),
+    false,
+  );
+});
+
 Deno.test("matchCommand: array exact rejects extra args", () => {
   assertEquals(
     matchCommand(["gh", "pr"], ["gh", "pr", "view"]),
@@ -355,6 +399,45 @@ Deno.test("allowlist: mixed string and array patterns", () => {
   assertEquals(
     isAllowed(["gh", "issue"], "/any", rules).allowed,
     true,
+  );
+});
+
+Deno.test("allowlist: regexp token pattern constrains gh api route", () => {
+  const rules: Rules = {
+    allow: {
+      "*": [[
+        "gh",
+        "api",
+        {
+          regexp:
+            "^repos/[A-Za-z0-9-]+/[A-Za-z0-9._-]+/pulls/[0-9]+/(comments|reviews|review_comments)$",
+        },
+      ]],
+    },
+  };
+  assertEquals(
+    isAllowed(
+      ["gh", "api", "repos/JLarky/lima-escape/pulls/948/comments"],
+      "/any",
+      rules,
+    ).allowed,
+    true,
+  );
+  assertEquals(
+    isAllowed(
+      ["gh", "api", "repos/JLarky/lima-escape/pulls/948/files"],
+      "/any",
+      rules,
+    ).allowed,
+    false,
+  );
+  assertEquals(
+    isAllowed(
+      ["gh", "api", "repos/JLarky/lima escape/pulls/948/comments"],
+      "/any",
+      rules,
+    ).allowed,
+    false,
   );
 });
 
