@@ -47,7 +47,17 @@ export function loadConfig(path?: string): Config {
     throw e;
   }
 
-  return v.parse(ConfigSchema, parseJsonc(text));
+  try {
+    return v.parse(ConfigSchema, parseJsonc(text));
+  } catch (e) {
+    if (v.isValiError(e)) {
+      const issue = e.issues[0];
+      const field = issue.path?.map((seg) => String(seg.key)).join(".") ??
+        "(root)";
+      throw new Error(`Invalid config at "${field}": ${issue.message}`);
+    }
+    throw e;
+  }
 }
 
 /** Re-read just the tokens array from config (for hot-reload on each request). */
