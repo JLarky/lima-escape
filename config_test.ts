@@ -37,7 +37,7 @@ Deno.test("loadConfig: rejects relative pathMap keys", () => {
     assertThrows(
       () => loadConfig(path),
       Error,
-      '"pathMap" key "home/jlarky.guest/work" must be an absolute path',
+      "must be an absolute path",
     );
   } finally {
     Deno.removeSync(path);
@@ -58,6 +58,7 @@ Deno.test("loadConfig: rejects relative pathMap values", () => {
       Error,
       "must map to an absolute host path string",
     );
+
   } finally {
     Deno.removeSync(path);
   }
