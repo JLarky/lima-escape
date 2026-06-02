@@ -195,8 +195,8 @@ lima-escape --help     # full setup reference
 
 ## Security
 
-1. **Token auth**: clients must present a token from `config.jsonc` — without it,
-   exec requests are rejected
+1. **Token auth**: clients must present a token from `config.jsonc` — without
+   it, exec requests are rejected
 2. **Allowlist**: only commands matching token-based patterns in config execute
 3. **No shell**: always `Deno.Command` with argv array, never `sh -c`
 4. **Argv-in, argv-out**: client sends pre-split argv from the OS, server
