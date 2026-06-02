@@ -1,6 +1,6 @@
 {
   "name": "@jlarky/lima-escape",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "MIT",
   "exports": {
     ".": "./server.ts",
