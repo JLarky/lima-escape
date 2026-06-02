@@ -452,16 +452,12 @@ Deno.test("getCwdStatus: reports rejected current cwd", async () => {
 
 Deno.test("formatCwdContext: includes host cwd when path mapped", () => {
   assertEquals(
-    formatCwdContext(
-      "/home/jlarky.guest/work/project",
-      "/home/jlarky.guest/work/project",
-      "/Users/jlarky/work/project",
-    ),
+    formatCwdContext("A", "B", "C"),
     [
       "cwd:",
-      "  requested: /home/jlarky.guest/work/project",
-      "  rules cwd: /home/jlarky.guest/work/project",
-      "  host cwd: /Users/jlarky/work/project",
+      "  requested: A",
+      "  rules cwd: B",
+      "  host cwd: C",
     ].join("\n"),
   );
 });
