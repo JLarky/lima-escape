@@ -240,9 +240,11 @@ Deno.test("cwd: allows git push in subdirectory (prefix match)", () => {
 });
 
 Deno.test("cwd: blocks git push in other dir", () => {
+  const result = isAllowed(["git", "push", "origin"], "/home/other", CWD_RULES);
+  assertEquals(result.allowed, false);
   assertEquals(
-    isAllowed(["git", "push", "origin"], "/home/other", CWD_RULES).allowed,
-    false,
+    result.allowed === false && result.reason.includes('cwd "/home/other"'),
+    true,
   );
 });
 

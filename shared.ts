@@ -165,6 +165,22 @@ export async function getCwdStatus(
   };
 }
 
+export function formatCwdContext(
+  requestedCwd: string,
+  rulesCwd: string,
+  hostCwd: string,
+): string {
+  const lines = [
+    "cwd:",
+    `  requested: ${requestedCwd}`,
+    `  rules cwd: ${rulesCwd}`,
+  ];
+  if (hostCwd !== rulesCwd) {
+    lines.push(`  host cwd: ${hostCwd}`);
+  }
+  return lines.join("\n");
+}
+
 async function executeCommand(argv: string[], cwd: string): Promise<Response> {
   const command = new Deno.Command(argv[0], { args: argv.slice(1), cwd });
   const { code, stdout, stderr } = await command.output();
@@ -270,8 +286,9 @@ async function handleConnection(conn: Deno.Conn, opts: ServerOptions) {
             res = {
               code: 1,
               stdout: "",
-              stderr:
-                `denied: ${result.reason}${hint}\n\nRun \`lima-escape --help\` for setup instructions or \`lima-escape --status\` to see currently allowed patterns.`,
+              stderr: `denied: ${result.reason}${hint}\n\n${
+                formatCwdContext(req.cwd, matchCwd, executionCwd)
+              }\n\nRun \`lima-escape --help\` for setup instructions or \`lima-escape --status\` to see currently allowed patterns.`,
               error: "denied",
             };
             console.log("denied:", cmd, "-", result.reason);

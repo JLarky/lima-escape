@@ -1,5 +1,6 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import {
+  formatCwdContext,
   getCwdStatus,
   MAX_OUTPUT_SIZE,
   resolveRequestCwd,
@@ -447,4 +448,16 @@ Deno.test("getCwdStatus: reports rejected current cwd", async () => {
   assertEquals(typeof status.error, "string");
   assertEquals(status.matchCwd, undefined);
   assertEquals(status.executionCwd, undefined);
+});
+
+Deno.test("formatCwdContext: includes host cwd when path mapped", () => {
+  assertEquals(
+    formatCwdContext("A", "B", "C"),
+    [
+      "cwd:",
+      "  requested: A",
+      "  rules cwd: B",
+      "  host cwd: C",
+    ].join("\n"),
+  );
 });

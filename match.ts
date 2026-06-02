@@ -176,7 +176,9 @@ export function isAllowed(
     const hint = findHint(argv, rules);
     return {
       allowed: false,
-      reason: `"${argv.join(" ")}" does not match any allowed pattern`,
+      reason: `"${
+        argv.join(" ")
+      }" does not match any allowed pattern for cwd "${cwd}"`,
       ...(hint ? { hint } : {}),
     };
   }
