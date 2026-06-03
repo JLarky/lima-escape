@@ -80,7 +80,7 @@ Setup:
        "pathMap": {
          "/home/jlarky.guest/work": "/Users/jlarky/work"
        },
-       "allow": { "*": ["gh pr view *", "git status"] },
+       "allow": { "*": ["gh pr view *", "gh pr diff *", "git status"] },
        "deny": { "/sensitive": ["git *"] }
      }
 

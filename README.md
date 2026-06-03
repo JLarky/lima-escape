@@ -77,7 +77,7 @@ rules scoped by directory:
   "allow": {
     "*": [
       "say *",
-      ["gh", "pr", ["list", "view", "checks"], "*"],
+      ["gh", "pr", ["list", "view", "checks", "diff"], "*"],
       ["gh", "issue", ["create", "edit", "list", "view"], "*"],
       "git status",
       "git log *",
@@ -106,7 +106,7 @@ Two formats are supported:
 **String patterns** (sugar for simple cases):
 
 ```json
-{ "allow": { "*": ["gh pr", "gh pr *", "git status"] } }
+{ "allow": { "*": ["gh pr", "gh pr view *", "gh pr diff *", "git status"] } }
 ```
 
 - `"gh pr"` — exact match, only `gh pr` with no trailing args

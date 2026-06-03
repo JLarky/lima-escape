@@ -61,7 +61,7 @@ export function loadConfig(path?: string): Config {
   } catch (e) {
     if (e instanceof Deno.errors.NotFound) {
       throw new Error(
-        `Config not found at ${p}\nCreate it with an "allow" object, e.g.:\n  { "allow": { "*": ["gh pr view *", "git status"] } }`,
+        `Config not found at ${p}\nCreate it with an "allow" object, e.g.:\n  { "allow": { "*": ["gh pr view *", "gh pr diff *", "git status"] } }`,
       );
     }
     throw e;
