@@ -2,6 +2,36 @@
 import { prettyPrintPattern } from "./match.ts";
 import { DEFAULT_PORT, startClient, type StatusInfo } from "./shared.ts";
 
+/** Format the allow/deny section of --status output. */
+export function formatStatusConfigSection(status: StatusInfo): string {
+  if (status.config) {
+    return "Config:\n" + JSON.stringify(status.config, null, 2);
+  }
+  const lines: string[] = ["Allowed patterns:"];
+  for (const [cwdPattern, patterns] of Object.entries(status.allow)) {
+    lines.push(`  [cwd: ${cwdPattern}]`);
+    for (const pattern of patterns) {
+      lines.push(`    ${prettyPrintPattern(pattern)}`);
+    }
+  }
+  if (status.deny) {
+    lines.push("", "Denied patterns:");
+    for (const [cwdPattern, patterns] of Object.entries(status.deny)) {
+      lines.push(`  [cwd: ${cwdPattern}]`);
+      for (const pattern of patterns) {
+        lines.push(`    ${prettyPrintPattern(pattern)}`);
+      }
+    }
+  }
+  if (status.pathMap) {
+    lines.push("", "Path mappings:");
+    for (const [vmPath, hostPath] of Object.entries(status.pathMap)) {
+      lines.push(`  ${vmPath} -> ${hostPath}`);
+    }
+  }
+  return lines.join("\n");
+}
+
 function tokenPath(): string {
   const home = Deno.env.get("HOME");
   if (!home) throw new Error("HOME not set");
@@ -138,28 +168,7 @@ Learn more at:
       // Old server that doesn't support --status
     }
     if (status?.allow) {
-      console.log("Allowed patterns:");
-      for (const [cwdPattern, patterns] of Object.entries(status.allow)) {
-        console.log(`  [cwd: ${cwdPattern}]`);
-        for (const pattern of patterns) {
-          console.log(`    ${prettyPrintPattern(pattern)}`);
-        }
-      }
-      if (status.deny) {
-        console.log("\nDenied patterns:");
-        for (const [cwdPattern, patterns] of Object.entries(status.deny)) {
-          console.log(`  [cwd: ${cwdPattern}]`);
-          for (const pattern of patterns) {
-            console.log(`    ${prettyPrintPattern(pattern)}`);
-          }
-        }
-      }
-      if (status.pathMap) {
-        console.log("\nPath mappings:");
-        for (const [vmPath, hostPath] of Object.entries(status.pathMap)) {
-          console.log(`  ${vmPath} -> ${hostPath}`);
-        }
-      }
+      console.log(formatStatusConfigSection(status));
       if (status.cwdStatus) {
         console.log("\nCurrent cwd:");
         console.log(`  requested  ${status.cwdStatus.requested}`);
@@ -183,7 +192,7 @@ Learn more at:
           cmds.join(",")
         } ${serverUrl}`;
       const configJson = JSON.stringify(
-        {
+        status.config ?? {
           ...(status.pathMap ? { pathMap: status.pathMap } : {}),
           allow: status.allow,
           ...(status.deny ? { deny: status.deny } : {}),

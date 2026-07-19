@@ -25,10 +25,14 @@ function checkToken(token: string): boolean {
   return loadTokens().includes(token);
 }
 
+// Strip secrets before exposing config via --status.
+const { tokens: _tokens, ...publicConfig } = config;
+
 await startServer({
   allow: config.allow,
   deny: config.deny,
   pathMap: config.pathMap,
+  config: publicConfig,
   isAllowed,
   checkToken,
 });

@@ -1,5 +1,8 @@
 import { assertEquals, assertThrows } from "@std/assert";
 import { loadConfig } from "./config.ts";
+import { formatStatusConfigSection } from "./main.ts";
+import type { Pattern } from "./match.ts";
+import { statusConfigFromOptions, type StatusInfo } from "./shared.ts";
 
 function writeTempConfig(config: unknown): string {
   const path = Deno.makeTempFileSync({ suffix: ".json" });
@@ -171,4 +174,96 @@ Deno.test("loadConfig: error includes pathMap key name for relative key", () => 
       );
     },
   );
+});
+
+// --- status config snapshot (public, no secrets) ---
+
+const REGEXP_PATTERN: Pattern = [
+  "gh",
+  "api",
+  {
+    regexp:
+      "^repos/[A-Za-z0-9-]+/[A-Za-z0-9._-]+/pulls/[0-9]+/(comments|reviews|review_comments)$",
+  },
+];
+
+Deno.test("statusConfigFromOptions: returns sanitized config without inventing fields", () => {
+  const config = statusConfigFromOptions({
+    allow: { "*": ["git status"] },
+    deny: { "/sensitive": ["git *"] },
+    pathMap: { "/vm": "/host" },
+  });
+  assertEquals(config, {
+    allow: { "*": ["git status"] },
+    deny: { "/sensitive": ["git *"] },
+    pathMap: { "/vm": "/host" },
+  });
+  assertEquals("tokens" in config, false);
+});
+
+Deno.test("statusConfigFromOptions: prefers explicit config and never leaks tokens", () => {
+  const secret = "super-secret-token-value";
+  const full = {
+    tokens: [secret],
+    allow: { "*": [REGEXP_PATTERN] },
+    deny: { "*": ["git push -f"] },
+  };
+  // Mirror server.ts: strip tokens before exposing via status.
+  const { tokens: _tokens, ...publicConfig } = full;
+  const config = statusConfigFromOptions({
+    allow: full.allow,
+    deny: full.deny,
+    config: publicConfig,
+  });
+  assertEquals(config.allow, full.allow);
+  assertEquals(config.deny, full.deny);
+  assertEquals("tokens" in config, false);
+  assertEquals(JSON.stringify(config).includes(secret), false);
+});
+
+Deno.test("statusConfigFromOptions: preserves regexp tokens verbatim", () => {
+  const config = statusConfigFromOptions({
+    allow: { "*": [REGEXP_PATTERN] },
+  });
+  assertEquals(config.allow["*"][0], REGEXP_PATTERN);
+  assertEquals(
+    JSON.stringify(config.allow["*"][0]),
+    JSON.stringify(REGEXP_PATTERN),
+  );
+});
+
+Deno.test("formatStatusConfigSection: prints config JSON verbatim when present", () => {
+  const status: StatusInfo = {
+    allow: { "*": [REGEXP_PATTERN] },
+    config: { allow: { "*": [REGEXP_PATTERN] } },
+    allowRun: { gh: "granted" },
+  };
+  const out = formatStatusConfigSection(status);
+  assertEquals(out.startsWith("Config:\n"), true);
+  assertEquals(
+    out.includes(
+      '"regexp": "^repos/[A-Za-z0-9-]+/[A-Za-z0-9._-]+/pulls/[0-9]+/(comments|reviews|review_comments)$"',
+    ),
+    true,
+  );
+  assertEquals(out.includes("[object Object]"), false);
+  assertEquals(out.includes("Allowed patterns:"), false);
+});
+
+Deno.test("formatStatusConfigSection: falls back to pretty-print when config missing", () => {
+  const status: StatusInfo = {
+    allow: { "*": ["git status", REGEXP_PATTERN] },
+    deny: { "/sensitive": ["git *"] },
+    pathMap: { "/vm": "/host" },
+    allowRun: { git: "granted" },
+  };
+  const out = formatStatusConfigSection(status);
+  assertEquals(out.includes("Allowed patterns:"), true);
+  assertEquals(out.includes("Denied patterns:"), true);
+  assertEquals(out.includes("Path mappings:"), true);
+  assertEquals(out.includes("git status"), true);
+  assertEquals(out.includes("/vm -> /host"), true);
+  // Fallback still JSON-stringifies structured patterns (no [object Object]).
+  assertEquals(out.includes(JSON.stringify(REGEXP_PATTERN)), true);
+  assertEquals(out.includes("Config:"), false);
 });

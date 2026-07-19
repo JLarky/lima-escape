@@ -13,9 +13,18 @@ export interface Request {
   token?: string;
 }
 
+/** Public config snapshot for --status (never includes tokens). */
+export interface StatusConfig {
+  allow: Record<string, Pattern[]>;
+  deny?: Record<string, Pattern[]>;
+  pathMap?: Record<string, string>;
+}
+
 export interface StatusInfo {
   allow: Record<string, Pattern[]>;
   deny?: Record<string, Pattern[]>;
+  /** Raw allow/deny/pathMap as loaded — preferred by new clients for verbatim display. */
+  config?: StatusConfig;
   pathMap?: Record<string, string>;
   cwdStatus?: CwdStatus;
   allowRun: Record<string, string>;
@@ -43,9 +52,26 @@ export interface ServerOptions {
   allow: Record<string, Pattern[]>;
   deny?: Record<string, Pattern[]>;
   pathMap?: Record<string, string>;
+  /** Sanitized config for status (must not include tokens). */
+  config?: StatusConfig;
   isAllowed: (argv: string[], cwd: string, rules: Rules) => AllowResult;
   port?: number;
   checkToken?: (token: string) => boolean;
+}
+
+/** Build the public config snapshot included in status responses. */
+export function statusConfigFromOptions(opts: {
+  allow: Record<string, Pattern[]>;
+  deny?: Record<string, Pattern[]>;
+  pathMap?: Record<string, string>;
+  config?: StatusConfig;
+}): StatusConfig {
+  if (opts.config) return opts.config;
+  return {
+    allow: opts.allow,
+    ...(opts.deny ? { deny: opts.deny } : {}),
+    ...(opts.pathMap ? { pathMap: opts.pathMap } : {}),
+  };
 }
 
 function pathSpecificity(path: string): number {
@@ -248,6 +274,7 @@ async function handleConnection(conn: Deno.Conn, opts: ServerOptions) {
       const status: StatusInfo = {
         allow: opts.allow,
         ...(opts.deny ? { deny: opts.deny } : {}),
+        config: statusConfigFromOptions(opts),
         ...(opts.pathMap ? { pathMap: opts.pathMap } : {}),
         cwdStatus: await getCwdStatus(req.cwd, opts.pathMap),
         allowRun,
