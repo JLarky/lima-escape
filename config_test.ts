@@ -2,7 +2,11 @@ import { assertEquals, assertThrows } from "@std/assert";
 import { loadConfig } from "./config.ts";
 import { formatStatusConfigSection } from "./main.ts";
 import type { Pattern } from "./match.ts";
-import { statusConfigFromOptions, type StatusInfo } from "./shared.ts";
+import {
+  type StatusConfig,
+  statusConfigFromOptions,
+  type StatusInfo,
+} from "./shared.ts";
 
 function writeTempConfig(config: unknown): string {
   const path = Deno.makeTempFileSync({ suffix: ".json" });
@@ -203,22 +207,26 @@ Deno.test("statusConfigFromOptions: returns sanitized config without inventing f
 
 Deno.test("statusConfigFromOptions: prefers explicit config and never leaks tokens", () => {
   const secret = "super-secret-token-value";
-  const full = {
+  // Runtime object may carry tokens despite StatusConfig (TS-only) typing.
+  const tainted = {
     tokens: [secret],
     allow: { "*": [REGEXP_PATTERN] },
     deny: { "*": ["git push -f"] },
-  };
-  // Mirror server.ts: strip tokens before exposing via status.
-  const { tokens: _tokens, ...publicConfig } = full;
+    pathMap: { "/vm": "/host" },
+  } as unknown as StatusConfig;
   const config = statusConfigFromOptions({
-    allow: full.allow,
-    deny: full.deny,
-    config: publicConfig,
+    allow: { "*": ["git status"] },
+    config: tainted,
   });
-  assertEquals(config.allow, full.allow);
-  assertEquals(config.deny, full.deny);
+  assertEquals(config, {
+    allow: { "*": [REGEXP_PATTERN] },
+    deny: { "*": ["git push -f"] },
+    pathMap: { "/vm": "/host" },
+  });
   assertEquals("tokens" in config, false);
-  assertEquals(JSON.stringify(config).includes(secret), false);
+  const json = JSON.stringify(config);
+  assertEquals(json.includes("tokens"), false);
+  assertEquals(json.includes(secret), false);
 });
 
 Deno.test("statusConfigFromOptions: preserves regexp tokens verbatim", () => {

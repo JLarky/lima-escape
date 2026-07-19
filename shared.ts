@@ -59,18 +59,21 @@ export interface ServerOptions {
   checkToken?: (token: string) => boolean;
 }
 
-/** Build the public config snapshot included in status responses. */
+/** Build the public config snapshot included in status responses.
+ * Always whitelists fields — never returns/spreads config wholesale
+ * (StatusConfig is TypeScript-only; a runtime object may still carry tokens).
+ */
 export function statusConfigFromOptions(opts: {
   allow: Record<string, Pattern[]>;
   deny?: Record<string, Pattern[]>;
   pathMap?: Record<string, string>;
   config?: StatusConfig;
 }): StatusConfig {
-  if (opts.config) return opts.config;
+  const src = opts.config ?? opts;
   return {
-    allow: opts.allow,
-    ...(opts.deny ? { deny: opts.deny } : {}),
-    ...(opts.pathMap ? { pathMap: opts.pathMap } : {}),
+    allow: src.allow,
+    ...(src.deny ? { deny: src.deny } : {}),
+    ...(src.pathMap ? { pathMap: src.pathMap } : {}),
   };
 }
 
