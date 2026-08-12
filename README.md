@@ -28,7 +28,7 @@ Create `~/.local/bin/lima-escape`:
 mkdir -p ~/.local/bin
 cat > ~/.local/bin/lima-escape << 'EOF'
 #!/bin/bash
-exec deno run --no-prompt --ignore-env --allow-env=HOME \
+exec deno run --no-prompt --no-lock --ignore-env --allow-env=HOME \
   --allow-read=$HOME/.lima-escape-token --allow-write=$HOME/.lima-escape-token \
   --allow-net=host.lima.internal:27332 \
   jsr:@jlarky/lima-escape/client "$@"
