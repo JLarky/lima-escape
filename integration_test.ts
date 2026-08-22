@@ -7,6 +7,7 @@ import {
   startClient,
   truncateOutput,
   validateCwd,
+  writeAll,
 } from "./shared.ts";
 import { isAllowed, type Rules } from "./match.ts";
 import type { Request, Response } from "./shared.ts";
@@ -59,7 +60,7 @@ async function handleConnection(conn: Deno.Conn, config: Rules) {
       };
     }
 
-    await conn.write(new TextEncoder().encode(JSON.stringify(res)));
+    await writeAll(conn, new TextEncoder().encode(JSON.stringify(res)));
   } finally {
     conn.close();
   }
@@ -142,6 +143,21 @@ Deno.test("integration: large stdout is truncated with message", async () => {
   });
 });
 
+Deno.test("integration: response larger than socket send buffer arrives intact", async () => {
+  await withServer(TEST_CONFIG, async (port) => {
+    // Response envelopes above typical TCP socket send buffers (~256-330KB
+    // on macOS) were silently truncated before the partial-write fix.
+    // `seq` keeps argv small while producing ~730KB of stdout, which the
+    // server caps at ~512KB — still far above any socket send buffer, so
+    // the client only parses the envelope when writeAll delivers all bytes.
+    const res = await startClient("127.0.0.1", port, ["seq", "1", "120000"]);
+    assertEquals(res.error, undefined);
+    assertEquals(res.code, 0);
+    assertEquals(res.stdout.length > 400_000, true);
+    assertEquals(res.stdout.startsWith("1\n"), true);
+  });
+});
+
 Deno.test("integration: very large stdout is truncated with truncation notice", async () => {
   // Use a custom server that returns a huge fake response to test client-side handling
   const port = nextPort++;
@@ -159,7 +175,7 @@ Deno.test("integration: very large stdout is truncated with truncation notice", 
             stdout: bigStdout,
             stderr: "",
           };
-          await conn.write(new TextEncoder().encode(JSON.stringify(res)));
+          await writeAll(conn, new TextEncoder().encode(JSON.stringify(res)));
         } finally {
           conn.close();
         }
@@ -255,7 +271,7 @@ async function handleAuthConnection(
       }
     }
 
-    await conn.write(new TextEncoder().encode(JSON.stringify(res)));
+    await writeAll(conn, new TextEncoder().encode(JSON.stringify(res)));
   } finally {
     conn.close();
   }

@@ -349,9 +349,23 @@ async function handleConnection(conn: Deno.Conn, opts: ServerOptions) {
       }
     }
 
-    await conn.write(new TextEncoder().encode(JSON.stringify(res)));
+    await writeAll(conn, new TextEncoder().encode(JSON.stringify(res)));
   } finally {
     conn.close();
+  }
+}
+
+/** Write the entire buffer, retrying until all bytes are accepted.
+ * Deno.Conn.write() may perform a partial write when the payload exceeds
+ * socket buffers; ignoring the returned byte count silently drops the tail.
+ */
+export async function writeAll(
+  conn: Deno.Conn,
+  data: Uint8Array,
+): Promise<void> {
+  let offset = 0;
+  while (offset < data.length) {
+    offset += await conn.write(data.subarray(offset));
   }
 }
 
