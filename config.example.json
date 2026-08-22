@@ -7,6 +7,7 @@
     "*": [
       "gh pr view *",
       "gh pr list *",
+      "gh pr diff *",
       [
         "gh",
         "api",
